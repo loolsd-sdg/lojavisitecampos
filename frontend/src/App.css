@@ -361,6 +361,63 @@ body {
   font-weight: 600;
 }
 
+/* ============= TELA DE CONFIGURAÇÕES ============= */
+.tela-configuracoes h2 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: #333;
+}
+
+.config-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  margin-bottom: 2rem;
+}
+
+.config-section h3 {
+  font-size: 1.4rem;
+  margin-bottom: 1.5rem;
+  color: #667eea;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.test-section {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  border: 2px solid #667eea;
+}
+
+.test-section p {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+.btn-teste {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.btn-teste:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn-teste:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ============= TELA DE PRODUTOS ============= */
 .tela-produtos h2 {
   font-size: 2rem;
@@ -571,14 +628,20 @@ body {
   background: #f8f9fa;
 }
 
+.venda-online {
+  background: rgba(102, 126, 234, 0.05) !important;
+}
+
 .acoes-vendas {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
 }
 
-.btn-pdf {
-  background: #e74c3c;
+.btn-download,
+.btn-whatsapp,
+.btn-deletar {
+  background: #3498db;
   color: white;
   border: none;
   padding: 0.5rem 0.8rem;
@@ -588,69 +651,60 @@ body {
   transition: opacity 0.2s;
 }
 
-.btn-pdf:hover {
-  opacity: 0.9;
+.btn-whatsapp {
+  background: #25D366;
 }
 
 .btn-deletar {
-  background: #c0392b;
-  color: white;
-  border: none;
-  padding: 0.5rem 0.8rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: opacity 0.2s;
+  background: #e74c3c;
 }
 
+.btn-download:hover,
+.btn-whatsapp:hover,
 .btn-deletar:hover {
   opacity: 0.9;
 }
 
-/* ============= RESPONSIVO ============= */
-@media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    gap: 1rem;
-  }
+/* Badges de status WhatsApp */
+.badge-online {
+  background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-block;
+}
 
-  .user-info {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+.badge-presencial {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-block;
+}
 
-  .nav-menu {
-    padding: 1rem;
-  }
+.badge-whatsapp-ok {
+  background: #27ae60;
+  color: white;
+  padding: 0.25rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+}
 
-  .main-content {
-    padding: 1rem;
-  }
-
-  .desconto-inputs {
-    grid-template-columns: 1fr;
-  }
-
-  .lista-produtos,
-  .lista-operadores {
-    grid-template-columns: 1fr;
-  }
-
-  .tabela-container {
-    overflow-x: scroll;
-  }
-
-  .tabela-vendas {
-    min-width: 800px;
-  }
-
-  .filtro-periodo {
-    flex-direction: column;
-  }
-
-  .resumo-geral {
-    grid-template-columns: 1fr;
-  }
+.badge-whatsapp-erro {
+  background: #e74c3c;
+  color: white;
+  padding: 0.25rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+  cursor: help;
 }
 
 /* ============= TELA DE RANKING ============= */
@@ -810,4 +864,50 @@ body {
 .sem-dados p {
   font-size: 1.2rem;
   color: #999;
+}
+
+/* ============= RESPONSIVO ============= */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .user-info {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .nav-menu {
+    padding: 1rem;
+  }
+
+  .main-content {
+    padding: 1rem;
+  }
+
+  .desconto-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .lista-produtos,
+  .lista-operadores {
+    grid-template-columns: 1fr;
+  }
+
+  .tabela-container {
+    overflow-x: scroll;
+  }
+
+  .tabela-vendas {
+    min-width: 800px;
+  }
+
+  .filtro-periodo {
+    flex-direction: column;
+  }
+
+  .resumo-geral {
+    grid-template-columns: 1fr;
+  }
 }

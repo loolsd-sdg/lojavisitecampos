@@ -63,6 +63,12 @@ function App() {
             >
               👥 Operadores
             </button>
+            <button 
+              className={tela === 'configuracoes' ? 'active' : ''} 
+              onClick={() => setTela('configuracoes')}
+            >
+              ⚙️ Configurações
+            </button>
           </>
         )}
         
@@ -87,6 +93,7 @@ function App() {
         {tela === 'historico' && <TelaHistorico isAdmin={isAdmin} />}
         {tela === 'operadores' && isAdmin && <TelaOperadores />}
         {tela === 'ranking' && <TelaRanking />}
+        {tela === 'configuracoes' && isAdmin && <TelaConfiguracoes />}
       </main>
     </div>
   );
@@ -201,7 +208,6 @@ function TelaVenda() {
     setLoading(true);
     setMensagem('');
 
-    // Validar telefone obrigatório
     if (!telefoneCliente) {
       alert('Por favor, informe o telefone do cliente');
       setLoading(false);
@@ -219,20 +225,15 @@ function TelaVenda() {
         telefone_cliente: telefoneCliente
       });
 
-      // Baixar PDF
-      const pdfResponse = await axios.get(`${API_URL}/vendas/${response.data.id}/pdf`, {
-        responseType: 'blob'
-      });
+      let mensagemSucesso = `✅ Venda #${response.data.codigo_venda} realizada com sucesso!`;
+      
+      if (response.data.whatsapp?.enviado) {
+        mensagemSucesso += ' 📱 Ingresso enviado via WhatsApp!';
+      } else if (response.data.whatsapp?.erro) {
+        mensagemSucesso += ` ⚠️ WhatsApp: ${response.data.whatsapp.erro}`;
+      }
 
-      const url = window.URL.createObjectURL(new Blob([pdfResponse.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `ingresso_${response.data.codigo_venda}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      setMensagem(`✅ Venda #${response.data.codigo_venda} realizada com sucesso!`);
+      setMensagem(mensagemSucesso);
       
       // Limpar formulário
       setNomeCliente('');
@@ -242,7 +243,7 @@ function TelaVenda() {
       setVendaOnline(false);
       setTelefoneCliente('');
       
-      setTimeout(() => setMensagem(''), 5000);
+      setTimeout(() => setMensagem(''), 7000);
     } catch (error) {
       alert(error.response?.data?.error || 'Erro ao registrar venda');
     } finally {
@@ -292,7 +293,7 @@ function TelaVenda() {
             pattern="[0-9]{10,11}"
           />
           <small style={{ color: '#666', fontSize: '0.85rem' }}>
-            Digite apenas números (ex: 22999887766)
+            Digite apenas números (ex: 22999887766). O ingresso será enviado automaticamente via WhatsApp! 📱
           </small>
         </div>
 
@@ -379,6 +380,185 @@ function TelaVenda() {
           {loading ? 'Processando...' : vendaOnline ? '🌐 Finalizar Venda Online' : '✅ Finalizar Venda'}
         </button>
       </form>
+    </div>
+  );
+}
+
+// ============= TELA DE CONFIGURAÇÕES =============
+function TelaConfiguracoes() {
+  const [configuracoes, setConfiguracoes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [testeTelefone, setTesteTelefone] = useState('');
+  const [loadingTeste, setLoadingTeste] = useState(false);
+
+  useEffect(() => {
+    carregarConfiguracoes();
+  }, []);
+
+  const carregarConfiguracoes = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/configuracoes`);
+      setConfiguracoes(response.data);
+    } catch (error) {
+      alert('Erro ao carregar configurações');
+    }
+  };
+
+  const handleSalvar = async (chave, valor) => {
+    setLoading(true);
+    try {
+      await axios.put(`${API_URL}/configuracoes/${chave}`, { valor });
+      alert('Configuração salva com sucesso!');
+      carregarConfiguracoes();
+    } catch (error) {
+      alert('Erro ao salvar configuração');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTesteWhatsApp = async () => {
+    if (!testeTelefone) {
+      alert('Digite um número de telefone para teste');
+      return;
+    }
+
+    setLoadingTeste(true);
+    try {
+      const response = await axios.post(`${API_URL}/configuracoes/testar-whatsapp`, {
+        telefone: testeTelefone
+      });
+      alert(response.data.message);
+    } catch (error) {
+      alert(error.response?.data?.error || 'Erro ao enviar teste');
+    } finally {
+      setLoadingTeste(false);
+    }
+  };
+
+  const getConfigValue = (chave) => {
+    const config = configuracoes.find(c => c.chave === chave);
+    return config ? config.valor : '';
+  };
+
+  const updateConfigValue = (chave, valor) => {
+    setConfiguracoes(configuracoes.map(c => 
+      c.chave === chave ? { ...c, valor } : c
+    ));
+  };
+
+  return (
+    <div className="tela-configuracoes">
+      <h2>⚙️ Configurações do Sistema</h2>
+
+      <div className="config-section">
+        <h3>🔌 Configurações da EvoAPI</h3>
+        
+        <div className="form-group">
+          <label>URL da API *</label>
+          <input
+            type="text"
+            value={getConfigValue('evoapi_url')}
+            onChange={(e) => updateConfigValue('evoapi_url', e.target.value)}
+            placeholder="http://148.230.76.31:8080"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>API Key *</label>
+          <input
+            type="text"
+            value={getConfigValue('evoapi_key')}
+            onChange={(e) => updateConfigValue('evoapi_key', e.target.value)}
+            placeholder="B6BDD71917CB-48D0-9C12-E4A4FFF24039"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Nome da Instância *</label>
+          <input
+            type="text"
+            value={getConfigValue('evoapi_instance')}
+            onChange={(e) => updateConfigValue('evoapi_instance', e.target.value)}
+            placeholder="visite"
+          />
+        </div>
+
+        <button 
+          onClick={() => {
+            handleSalvar('evoapi_url', getConfigValue('evoapi_url'));
+            handleSalvar('evoapi_key', getConfigValue('evoapi_key'));
+            handleSalvar('evoapi_instance', getConfigValue('evoapi_instance'));
+          }}
+          disabled={loading}
+          className="btn-salvar"
+        >
+          {loading ? 'Salvando...' : '💾 Salvar Configurações da API'}
+        </button>
+      </div>
+
+      <div className="config-section">
+        <h3>📱 Configurações do WhatsApp</h3>
+
+        <div className="form-group-checkbox">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={getConfigValue('whatsapp_ativo') === '1'}
+              onChange={(e) => updateConfigValue('whatsapp_ativo', e.target.checked ? '1' : '0')}
+            />
+            <span className="checkbox-text">Enviar ingresso automaticamente via WhatsApp</span>
+          </label>
+        </div>
+
+        <div className="form-group">
+          <label>Mensagem do WhatsApp</label>
+          <textarea
+            value={getConfigValue('whatsapp_mensagem')}
+            onChange={(e) => updateConfigValue('whatsapp_mensagem', e.target.value)}
+            rows="6"
+            placeholder="Use {nome} para o nome do cliente e {codigo} para o código da venda"
+          />
+          <small style={{ color: '#666', fontSize: '0.85rem' }}>
+            Variáveis disponíveis: {'{nome}'} = Nome do cliente, {'{codigo}'} = Código da venda
+          </small>
+        </div>
+
+        <button 
+          onClick={() => {
+            handleSalvar('whatsapp_ativo', getConfigValue('whatsapp_ativo'));
+            handleSalvar('whatsapp_mensagem', getConfigValue('whatsapp_mensagem'));
+          }}
+          disabled={loading}
+          className="btn-salvar"
+        >
+          {loading ? 'Salvando...' : '💾 Salvar Configurações do WhatsApp'}
+        </button>
+      </div>
+
+      <div className="config-section test-section">
+        <h3>🧪 Teste de Envio</h3>
+        <p>Envie um ingresso de teste para verificar se as configurações estão corretas:</p>
+        
+        <div className="form-group">
+          <label>Telefone para Teste (com DDD)</label>
+          <input
+            type="tel"
+            value={testeTelefone}
+            onChange={(e) => setTesteTelefone(e.target.value)}
+            placeholder="Ex: 22999887766"
+            pattern="[0-9]{10,11}"
+          />
+        </div>
+
+        <button 
+          onClick={handleTesteWhatsApp}
+          disabled={loadingTeste}
+          className="btn-teste"
+        >
+          {loadingTeste ? 'Enviando...' : '📤 Enviar Teste de WhatsApp'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -545,28 +725,34 @@ function TelaHistorico({ isAdmin }) {
     }
   };
 
-  const baixarPDF = async (id, codigo) => {
+  const baixarImagem = async (id, codigo) => {
     try {
-      const response = await axios.get(`${API_URL}/vendas/${id}/pdf`, {
+      const response = await axios.get(`${API_URL}/vendas/${id}/imagem`, {
         responseType: 'blob'
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `ingresso_${codigo}.pdf`);
+      link.setAttribute('download', `ingresso_${codigo}.jpg`);
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (error) {
-      alert('Erro ao baixar PDF');
+      alert('Erro ao baixar imagem');
     }
   };
 
-  const enviarWhatsApp = (telefone, nomeCliente, codigo) => {
-    const mensagem = `Olá ${nomeCliente}! Segue seu ingresso #${codigo}. Obrigado pela compra!`;
-    const url = `https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`;
-    window.open(url, '_blank');
+  const reenviarWhatsApp = async (id) => {
+    if (window.confirm('Deseja reenviar o ingresso via WhatsApp?')) {
+      try {
+        await axios.post(`${API_URL}/vendas/${id}/reenviar-whatsapp`);
+        alert('Ingresso reenviado com sucesso!');
+        carregarVendas();
+      } catch (error) {
+        alert(error.response?.data?.error || 'Erro ao reenviar WhatsApp');
+      }
+    }
   };
 
   const deletarVenda = async (id) => {
@@ -596,6 +782,7 @@ function TelaHistorico({ isAdmin }) {
               <th>Total</th>
               <th>Vendedor</th>
               <th>Tipo</th>
+              <th>WhatsApp</th>
               <th>Data</th>
               <th>Ações</th>
             </tr>
@@ -616,21 +803,34 @@ function TelaHistorico({ isAdmin }) {
                     <span className="badge-presencial">🏪 Presencial</span>
                   )}
                 </td>
+                <td>
+                  {venda.telefone_cliente ? (
+                    venda.whatsapp_enviado ? (
+                      <span className="badge-whatsapp-ok">✅ Enviado</span>
+                    ) : (
+                      <span className="badge-whatsapp-erro" title={venda.whatsapp_erro || 'Erro no envio'}>
+                        ❌ Erro
+                      </span>
+                    )
+                  ) : (
+                    <span>-</span>
+                  )}
+                </td>
                 <td>{new Date(venda.created_at).toLocaleString('pt-BR')}</td>
                 <td>
                   <div className="acoes-vendas">
                     <button
-                      onClick={() => baixarPDF(venda.id, venda.codigo_venda)}
-                      className="btn-pdf"
-                      title="Baixar PDF"
+                      onClick={() => baixarImagem(venda.id, venda.codigo_venda)}
+                      className="btn-download"
+                      title="Baixar Ingresso"
                     >
-                      📄
+                      📥
                     </button>
                     {venda.telefone_cliente && (
                       <button
-                        onClick={() => enviarWhatsApp(venda.telefone_cliente, venda.nome_cliente, venda.codigo_venda)}
+                        onClick={() => reenviarWhatsApp(venda.id)}
                         className="btn-whatsapp"
-                        title="Enviar no WhatsApp"
+                        title="Reenviar WhatsApp"
                       >
                         💬
                       </button>

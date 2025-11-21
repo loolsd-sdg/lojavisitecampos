@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const PDFDocument = require('pdfkit');
 const db = require('./database');
+const { gerarEEnviarIngresso } = require('./whatsapp');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -78,6 +79,69 @@ app.post('/api/login', (req, res) => {
         permissao: operador.permissao || 'usuario'
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= ROTAS DE CONFIGURAÇÕES (APENAS ADMIN) =============
+
+// Listar configurações
+app.get('/api/configuracoes', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const configs = db.prepare('SELECT * FROM configuracoes ORDER BY chave').all();
+    res.json(configs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Atualizar configuração
+app.put('/api/configuracoes/:chave', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { chave } = req.params;
+    const { valor } = req.body;
+
+    db.prepare('UPDATE configuracoes SET valor = ?, updated_at = CURRENT_TIMESTAMP WHERE chave = ?').run(valor, chave);
+    res.json({ message: 'Configuração atualizada com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Testar envio de WhatsApp
+app.post('/api/configuracoes/testar-whatsapp', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { telefone } = req.body;
+
+    if (!telefone) {
+      return res.status(400).json({ error: 'Telefone é obrigatório' });
+    }
+
+    // Criar uma venda fake para teste
+    const vendaTeste = {
+      id: 0,
+      codigo_venda: '0000',
+      nome_cliente: 'Teste',
+      produto_nome: 'Produto Teste',
+      quantidade_pessoas: 1,
+      preco_unitario: 50.00,
+      subtotal: 50.00,
+      desconto: 0,
+      valor_total: 50.00,
+      operador_nome: req.user.nome,
+      telefone_cliente: telefone,
+      created_at: new Date().toISOString()
+    };
+
+    const resultado = await gerarEEnviarIngresso(vendaTeste);
+    
+    if (resultado.whatsapp.sucesso) {
+      res.json({ message: 'Mensagem de teste enviada com sucesso!', detalhes: resultado.whatsapp });
+    } else {
+      res.status(400).json({ error: 'Falha no envio', detalhes: resultado.whatsapp.erro });
+    }
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -231,7 +295,7 @@ app.get('/api/vendas/proximo-codigo', authenticateToken, (req, res) => {
 });
 
 // Criar venda (TODOS)
-app.post('/api/vendas', authenticateToken, (req, res) => {
+app.post('/api/vendas', authenticateToken, async (req, res) => {
   try {
     const {
       nome_cliente,
@@ -300,12 +364,36 @@ app.post('/api/vendas', authenticateToken, (req, res) => {
       telefone_cliente || null
     );
 
+    const vendaId = result.lastInsertRowid;
+
+    // Buscar venda completa
+    const venda = db.prepare('SELECT * FROM vendas WHERE id = ?').get(vendaId);
+
+    // Gerar e enviar ingresso via WhatsApp (assíncrono)
+    let whatsappStatus = { enviado: false, erro: null };
+    if (telefone_cliente) {
+      try {
+        console.log('📱 Iniciando envio de WhatsApp...');
+        const resultado = await gerarEEnviarIngresso(venda);
+        whatsappStatus = {
+          enviado: resultado.whatsapp.sucesso,
+          erro: resultado.whatsapp.erro || null
+        };
+        console.log('WhatsApp status:', whatsappStatus);
+      } catch (error) {
+        console.error('Erro ao enviar WhatsApp:', error);
+        whatsappStatus = { enviado: false, erro: error.message };
+      }
+    }
+
     res.status(201).json({
-      id: result.lastInsertRowid,
+      id: vendaId,
       codigo_venda,
-      message: 'Venda registrada com sucesso'
+      message: 'Venda registrada com sucesso',
+      whatsapp: whatsappStatus
     });
   } catch (error) {
+    console.error('Erro ao criar venda:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -389,7 +477,56 @@ app.delete('/api/vendas/:id', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
-// Gerar PDF do comprovante (TODOS)
+// Baixar imagem do ingresso (TODOS)
+app.get('/api/vendas/:id/imagem', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const venda = db.prepare('SELECT * FROM vendas WHERE id = ?').get(id);
+
+    if (!venda) {
+      return res.status(404).json({ error: 'Venda não encontrada' });
+    }
+
+    const { gerarImagemIngresso } = require('./whatsapp');
+    const imagemBuffer = await gerarImagemIngresso(venda);
+
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Content-Disposition', `attachment; filename=ingresso_${venda.codigo_venda}.jpg`);
+    res.send(imagemBuffer);
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reenviar WhatsApp (TODOS)
+app.post('/api/vendas/:id/reenviar-whatsapp', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const venda = db.prepare('SELECT * FROM vendas WHERE id = ?').get(id);
+
+    if (!venda) {
+      return res.status(404).json({ error: 'Venda não encontrada' });
+    }
+
+    if (!venda.telefone_cliente) {
+      return res.status(400).json({ error: 'Venda não possui telefone cadastrado' });
+    }
+
+    const resultado = await gerarEEnviarIngresso(venda);
+
+    if (resultado.whatsapp.sucesso) {
+      res.json({ message: 'Ingresso reenviado com sucesso!' });
+    } else {
+      res.status(400).json({ error: 'Falha no reenvio', detalhes: resultado.whatsapp.erro });
+    }
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Gerar PDF do comprovante (TODOS) - mantido para compatibilidade
 app.get('/api/vendas/:id/pdf', authenticateToken, (req, res) => {
   try {
     const { id } = req.params;
