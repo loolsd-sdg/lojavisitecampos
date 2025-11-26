@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const PDFDocument = require('pdfkit');
 const db = require('./database');
 const { gerarEEnviarIngresso } = require('./whatsapp');
+const yampi = require('./yampi');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -84,6 +85,311 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// ============= ROTAS DE ATRAÇÕES (APENAS ADMIN) =============
+
+// Listar atrações
+app.get('/api/atracoes', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const atracoes = db.prepare('SELECT * FROM atracoes WHERE ativo = 1 ORDER BY nome').all();
+    res.json(atracoes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Criar atração
+app.post('/api/atracoes', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { nome, descricao, responsavel, telefone, email } = req.body;
+
+    if (!nome) {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+
+    const result = db.prepare(`
+      INSERT INTO atracoes (nome, descricao, responsavel, telefone, email)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(nome, descricao || '', responsavel || '', telefone || '', email || '');
+
+    res.status(201).json({ 
+      id: result.lastInsertRowid, 
+      message: 'Atração criada com sucesso' 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Atualizar atração
+app.put('/api/atracoes/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, descricao, responsavel, telefone, email } = req.body;
+
+    db.prepare(`
+      UPDATE atracoes SET
+        nome = ?, descricao = ?, responsavel = ?, telefone = ?, email = ?
+      WHERE id = ?
+    `).run(nome, descricao || '', responsavel || '', telefone || '', email || '', id);
+
+    res.json({ message: 'Atração atualizada com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Desativar atração
+app.delete('/api/atracoes/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('UPDATE atracoes SET ativo = 0 WHERE id = ?').run(id);
+    res.json({ message: 'Atração desativada com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Relatório financeiro de uma atração
+app.get('/api/atracoes/:id/relatorio', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { dataInicio, dataFim } = req.query;
+
+    // Buscar atração
+    const atracao = db.prepare('SELECT * FROM atracoes WHERE id = ?').get(id);
+    if (!atracao) {
+      return res.status(404).json({ error: 'Atração não encontrada' });
+    }
+
+    // Query base
+    let query = `
+      SELECT 
+        i.id,
+        i.produto_yampi_nome,
+        i.quantidade,
+        i.valor_total,
+        i.data_classificacao,
+        p.numero_pedido,
+        p.cliente_nome,
+        p.data_pedido,
+        prod.nome as produto_interno_nome,
+        prod.tipo_comissao,
+        prod.valor_comissao
+      FROM itens_pedido_yampi i
+      INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+      LEFT JOIN produtos prod ON i.produto_id = prod.id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `;
+
+    const params = [id];
+
+    if (dataInicio) {
+      query += ` AND DATE(p.data_pedido) >= DATE(?)`;
+      params.push(dataInicio);
+    }
+
+    if (dataFim) {
+      query += ` AND DATE(p.data_pedido) <= DATE(?)`;
+      params.push(dataFim);
+    }
+
+    query += ` ORDER BY p.data_pedido DESC`;
+
+    const itens = db.prepare(query).all(...params);
+
+    // Calcular totais
+    let faturamentoTotal = 0;
+    let comissaoTotal = 0;
+
+    itens.forEach(item => {
+      faturamentoTotal += item.valor_total;
+
+      if (item.tipo_comissao && item.valor_comissao) {
+        if (item.tipo_comissao === 'percentual') {
+          comissaoTotal += (item.valor_total * item.valor_comissao) / 100;
+        } else {
+          comissaoTotal += item.valor_comissao * item.quantidade;
+        }
+      }
+    });
+
+    const valorLiquido = faturamentoTotal - comissaoTotal;
+
+    res.json({
+      atracao,
+      resumo: {
+        faturamentoTotal,
+        comissaoTotal,
+        valorLiquido,
+        totalItens: itens.length
+      },
+      itens
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= ROTAS YAMPI (APENAS ADMIN) =============
+
+// Testar conexão Yampi
+app.post('/api/yampi/testar-conexao', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const resultado = await yampi.testarConexao();
+    res.json(resultado);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sincronizar pedidos
+app.post('/api/yampi/sincronizar', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { page, limit, filters } = req.body;
+    const resultado = await yampi.sincronizarPedidos({ page, limit, filters });
+    res.json(resultado);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar pedidos importados
+app.get('/api/yampi/pedidos', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+    
+    const pedidos = db.prepare(`
+      SELECT * FROM pedidos_yampi 
+      ORDER BY data_pedido DESC 
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+
+    const total = db.prepare('SELECT COUNT(*) as count FROM pedidos_yampi').get();
+
+    res.json({
+      pedidos,
+      total: total.count,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Detalhes de um pedido
+app.get('/api/yampi/pedidos/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const pedido = db.prepare('SELECT * FROM pedidos_yampi WHERE id = ?').get(id);
+    if (!pedido) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    const itens = db.prepare(`
+      SELECT i.*, 
+             p.nome as produto_interno_nome,
+             a.nome as atracao_nome
+      FROM itens_pedido_yampi i
+      LEFT JOIN produtos p ON i.produto_id = p.id
+      LEFT JOIN atracoes a ON i.atracao_id = a.id
+      WHERE i.pedido_yampi_id = ?
+    `).all(id);
+
+    res.json({ pedido, itens });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar itens não classificados
+app.get('/api/yampi/itens-nao-classificados', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const itens = db.prepare(`
+      SELECT i.*, 
+             p.numero_pedido,
+             p.cliente_nome,
+             p.data_pedido
+      FROM itens_pedido_yampi i
+      INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+      WHERE i.classificado = 0
+      ORDER BY p.data_pedido DESC
+      LIMIT 100
+    `).all();
+
+    res.json(itens);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Classificar item de pedido
+app.put('/api/yampi/itens/:id/classificar', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { produto_id, atracao_id } = req.body;
+
+    if (!produto_id || !atracao_id) {
+      return res.status(400).json({ error: 'produto_id e atracao_id são obrigatórios' });
+    }
+
+    db.prepare(`
+      UPDATE itens_pedido_yampi SET
+        produto_id = ?,
+        atracao_id = ?,
+        classificado = 1,
+        data_classificacao = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(produto_id, atracao_id, id);
+
+    res.json({ message: 'Item classificado com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Classificar múltiplos itens
+app.post('/api/yampi/itens/classificar-lote', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { itens } = req.body; // Array de { id, produto_id, atracao_id }
+
+    if (!Array.isArray(itens) || itens.length === 0) {
+      return res.status(400).json({ error: 'Array de itens é obrigatório' });
+    }
+
+    const stmt = db.prepare(`
+      UPDATE itens_pedido_yampi SET
+        produto_id = ?,
+        atracao_id = ?,
+        classificado = 1,
+        data_classificacao = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+
+    let sucesso = 0;
+    let erros = 0;
+
+    itens.forEach(item => {
+      try {
+        stmt.run(item.produto_id, item.atracao_id, item.id);
+        sucesso++;
+      } catch (error) {
+        console.error(`Erro ao classificar item ${item.id}:`, error);
+        erros++;
+      }
+    });
+
+    res.json({ 
+      message: `Classificação concluída: ${sucesso} sucesso, ${erros} erros`,
+      sucesso,
+      erros
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============= ROTAS DE CONFIGURAÇÕES (APENAS ADMIN) =============
 
 // Listar configurações
@@ -118,7 +424,6 @@ app.post('/api/configuracoes/testar-whatsapp', authenticateToken, requireAdmin, 
       return res.status(400).json({ error: 'Telefone é obrigatório' });
     }
 
-    // Criar uma venda fake para teste
     const vendaTeste = {
       id: 0,
       codigo_venda: '0000',
@@ -192,18 +497,15 @@ app.delete('/api/operadores/:id', authenticateToken, requireAdmin, (req, res) =>
   try {
     const { id } = req.params;
     
-    // Verificar se não está tentando deletar a si mesmo
     if (parseInt(id) === req.user.id) {
       return res.status(400).json({ error: 'Você não pode deletar seu próprio usuário' });
     }
 
-    // Verificar se o operador existe
     const operador = db.prepare('SELECT * FROM operadores WHERE id = ?').get(id);
     if (!operador) {
       return res.status(404).json({ error: 'Operador não encontrado' });
     }
 
-    // Desativar o operador
     db.prepare('UPDATE operadores SET ativo = 0 WHERE id = ?').run(id);
     res.json({ message: 'Operador desativado com sucesso' });
   } catch (error) {
@@ -216,7 +518,13 @@ app.delete('/api/operadores/:id', authenticateToken, requireAdmin, (req, res) =>
 // Listar produtos ativos (TODOS podem ver)
 app.get('/api/produtos', authenticateToken, (req, res) => {
   try {
-    const produtos = db.prepare('SELECT * FROM produtos WHERE ativo = 1 ORDER BY nome').all();
+    const produtos = db.prepare(`
+      SELECT p.*, a.nome as atracao_nome
+      FROM produtos p
+      LEFT JOIN atracoes a ON p.atracao_id = a.id
+      WHERE p.ativo = 1 
+      ORDER BY p.nome
+    `).all();
     res.json(produtos);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -226,16 +534,22 @@ app.get('/api/produtos', authenticateToken, (req, res) => {
 // Criar produto (APENAS ADMIN)
 app.post('/api/produtos', authenticateToken, requireAdmin, (req, res) => {
   try {
-    const { nome, preco, descricao } = req.body;
+    const { nome, preco, descricao, atracao_id, tipo_comissao, valor_comissao } = req.body;
 
     if (!nome || !preco) {
       return res.status(400).json({ error: 'Nome e preço são obrigatórios' });
     }
 
-    const result = db.prepare('INSERT INTO produtos (nome, preco, descricao) VALUES (?, ?, ?)').run(
+    const result = db.prepare(`
+      INSERT INTO produtos (nome, preco, descricao, atracao_id, tipo_comissao, valor_comissao) 
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
       nome,
       parseFloat(preco),
-      descricao || ''
+      descricao || '',
+      atracao_id || null,
+      tipo_comissao || 'percentual',
+      parseFloat(valor_comissao || 0)
     );
 
     res.status(201).json({ id: result.lastInsertRowid, message: 'Produto criado com sucesso' });
@@ -248,12 +562,24 @@ app.post('/api/produtos', authenticateToken, requireAdmin, (req, res) => {
 app.put('/api/produtos/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, preco, descricao } = req.body;
+    const { nome, preco, descricao, atracao_id, tipo_comissao, valor_comissao } = req.body;
 
-    db.prepare('UPDATE produtos SET nome = ?, preco = ?, descricao = ? WHERE id = ?').run(
+    db.prepare(`
+      UPDATE produtos SET 
+        nome = ?, 
+        preco = ?, 
+        descricao = ?,
+        atracao_id = ?,
+        tipo_comissao = ?,
+        valor_comissao = ?
+      WHERE id = ?
+    `).run(
       nome,
       parseFloat(preco),
       descricao || '',
+      atracao_id || null,
+      tipo_comissao || 'percentual',
+      parseFloat(valor_comissao || 0),
       id
     );
 
@@ -311,13 +637,11 @@ app.post('/api/vendas', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Dados incompletos' });
     }
 
-    // Buscar produto
     const produto = db.prepare('SELECT * FROM produtos WHERE id = ?').get(produto_id);
     if (!produto) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    // Calcular valores
     const preco_unitario = produto.preco;
     const subtotal = preco_unitario * quantidade_pessoas;
     let valor_desconto = 0;
@@ -332,7 +656,6 @@ app.post('/api/vendas', authenticateToken, async (req, res) => {
 
     const valor_total = subtotal - valor_desconto;
 
-    // Gerar código de venda
     const ultimaVenda = db.prepare('SELECT codigo_venda FROM vendas ORDER BY id DESC LIMIT 1').get();
     let proximoNumero = 1;
     if (ultimaVenda) {
@@ -340,7 +663,6 @@ app.post('/api/vendas', authenticateToken, async (req, res) => {
     }
     const codigo_venda = proximoNumero.toString().padStart(4, '0');
 
-    // Inserir venda
     const result = db.prepare(`
       INSERT INTO vendas (
         nome_cliente, produto_id, produto_nome, quantidade_pessoas,
@@ -365,11 +687,8 @@ app.post('/api/vendas', authenticateToken, async (req, res) => {
     );
 
     const vendaId = result.lastInsertRowid;
-
-    // Buscar venda completa
     const venda = db.prepare('SELECT * FROM vendas WHERE id = ?').get(vendaId);
 
-    // Gerar e enviar ingresso via WhatsApp (assíncrono)
     let whatsappStatus = { enviado: false, erro: null };
     if (telefone_cliente) {
       try {
@@ -418,8 +737,6 @@ app.get('/api/vendas/estatisticas', authenticateToken, (req, res) => {
     const { periodo } = req.query;
     
     let whereClause = '';
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
     
     switch(periodo) {
       case 'hoje':
@@ -454,7 +771,6 @@ app.get('/api/vendas/estatisticas', authenticateToken, (req, res) => {
     
     const estatisticas = db.prepare(query).all();
     
-    // Adicionar ranking (posição)
     const estatisticasComRanking = estatisticas.map((item, index) => ({
       ...item,
       ranking: index + 1
@@ -526,91 +842,10 @@ app.post('/api/vendas/:id/reenviar-whatsapp', authenticateToken, async (req, res
   }
 });
 
-// Gerar PDF do comprovante (TODOS) - mantido para compatibilidade
-app.get('/api/vendas/:id/pdf', authenticateToken, (req, res) => {
-  try {
-    const { id } = req.params;
-    const venda = db.prepare('SELECT * FROM vendas WHERE id = ?').get(id);
-
-    if (!venda) {
-      return res.status(404).json({ error: 'Venda não encontrada' });
-    }
-
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=ingresso_${venda.codigo_venda}.pdf`);
-
-    doc.pipe(res);
-
-    // Cabeçalho
-    doc.fontSize(24).fillColor('#2c3e50').text('VISITE CAMPOS', { align: 'center' });
-    doc.moveDown(0.3);
-    doc.fontSize(14).fillColor('#7f8c8d').text('COMPROVANTE DE VENDA', { align: 'center' });
-    doc.moveDown(1);
-
-    // Linha separadora
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#bdc3c7');
-    doc.moveDown(1.5);
-
-    // Código da venda (destaque)
-    doc.fontSize(16).fillColor('#e74c3c').text(`Código: #${venda.codigo_venda}`, { align: 'center' });
-    doc.moveDown(1.5);
-
-    // Dados do cliente e produto
-    doc.fontSize(12).fillColor('#2c3e50');
-    
-    doc.text(`Cliente: `, { continued: true }).fillColor('#34495e').text(venda.nome_cliente);
-    doc.moveDown(0.8);
-    
-    doc.fillColor('#2c3e50').text(`Produto: `, { continued: true }).fillColor('#34495e').text(venda.produto_nome);
-    doc.moveDown(0.8);
-    
-    doc.fillColor('#2c3e50').text(`Quantidade de Pessoas: `, { continued: true }).fillColor('#34495e').text(venda.quantidade_pessoas.toString());
-    doc.moveDown(1.5);
-
-    // Valores
-    doc.fontSize(11).fillColor('#7f8c8d');
-    doc.text(`Valor Unitário: R$ ${venda.preco_unitario.toFixed(2)}`);
-    doc.moveDown(0.5);
-    doc.text(`Subtotal: R$ ${venda.subtotal.toFixed(2)}`);
-    doc.moveDown(0.5);
-
-    if (venda.desconto > 0) {
-      const textoDesconto = venda.tipo_desconto === 'percentual' 
-        ? `Desconto: R$ ${venda.desconto.toFixed(2)}`
-        : `Desconto: R$ ${venda.desconto.toFixed(2)}`;
-      doc.fillColor('#e74c3c').text(textoDesconto);
-      doc.moveDown(0.5);
-    }
-
-    doc.fontSize(14).fillColor('#27ae60').text(`TOTAL: R$ ${venda.valor_total.toFixed(2)}`, { align: 'left' });
-    doc.moveDown(2);
-
-    // Linha separadora
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#bdc3c7');
-    doc.moveDown(1);
-
-    // Rodapé
-    doc.fontSize(10).fillColor('#95a5a6');
-    const dataHora = new Date(venda.created_at).toLocaleString('pt-BR');
-    doc.text(`Data/Hora: ${dataHora}`);
-    doc.moveDown(0.5);
-    doc.text(`Vendedor: ${venda.operador_nome}`);
-    doc.moveDown(2);
-
-    doc.fontSize(9).fillColor('#bdc3c7').text('Obrigado pela preferência!', { align: 'center' });
-
-    doc.end();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ============= ROTA DE STATUS =============
 
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'online', message: 'PDV Visite Campos API' });
+  res.json({ status: 'online', message: 'PDV Visite Campos API com Yampi' });
 });
 
 // Iniciar servidor
@@ -618,6 +853,7 @@ app.listen(PORT, () => {
   console.log(`
   ╔════════════════════════════════════════╗
   ║   🎫 PDV VISITE CAMPOS - Backend      ║
+  ║   + Integração Yampi 🛒               ║
   ║   Servidor rodando na porta ${PORT}      ║
   ╚════════════════════════════════════════╝
   `);
