@@ -11,8 +11,10 @@ db.exec(`
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     permissao TEXT DEFAULT 'usuario',
+    atracao_id INTEGER,
     ativo INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (atracao_id) REFERENCES atracoes(id)
   );
 
   CREATE TABLE IF NOT EXISTS atracoes (
@@ -90,9 +92,13 @@ db.exec(`
     atracao_id INTEGER,
     classificado INTEGER DEFAULT 0,
     data_classificacao DATETIME,
+    presenca_confirmada INTEGER DEFAULT 0,
+    data_confirmacao_presenca DATETIME,
+    confirmado_por INTEGER,
     FOREIGN KEY (pedido_yampi_id) REFERENCES pedidos_yampi(id),
     FOREIGN KEY (produto_id) REFERENCES produtos(id),
-    FOREIGN KEY (atracao_id) REFERENCES atracoes(id)
+    FOREIGN KEY (atracao_id) REFERENCES atracoes(id),
+    FOREIGN KEY (confirmado_por) REFERENCES operadores(id)
   );
 
   CREATE TABLE IF NOT EXISTS configuracoes (
@@ -117,6 +123,15 @@ try {
   console.log('⚙️ Adicionando coluna de permissão...');
   db.exec(`ALTER TABLE operadores ADD COLUMN permissao TEXT DEFAULT 'usuario'`);
   console.log('✅ Coluna de permissão adicionada');
+}
+
+// Verificar e adicionar coluna atracao_id aos operadores
+try {
+  db.prepare('SELECT atracao_id FROM operadores LIMIT 1').get();
+} catch (error) {
+  console.log('⚙️ Adicionando coluna atracao_id aos operadores...');
+  db.exec(`ALTER TABLE operadores ADD COLUMN atracao_id INTEGER`);
+  console.log('✅ Coluna atracao_id adicionada aos operadores');
 }
 
 // Verificar e adicionar colunas de venda online
@@ -219,6 +234,21 @@ try {
   console.log('✅ Coluna produto_id adicionada aos itens');
 }
 
+// ============================================
+// 🆕 MIGRAÇÕES PARA CONFIRMAÇÃO DE PRESENÇA
+// ============================================
+
+// Adicionar colunas de confirmação de presença
+try {
+  db.prepare('SELECT presenca_confirmada FROM itens_pedido_yampi LIMIT 1').get();
+} catch (error) {
+  console.log('⚙️ Adicionando colunas de confirmação de presença...');
+  db.exec(`ALTER TABLE itens_pedido_yampi ADD COLUMN presenca_confirmada INTEGER DEFAULT 0`);
+  db.exec(`ALTER TABLE itens_pedido_yampi ADD COLUMN data_confirmacao_presenca DATETIME`);
+  db.exec(`ALTER TABLE itens_pedido_yampi ADD COLUMN confirmado_por INTEGER`);
+  console.log('✅ Colunas de confirmação de presença adicionadas');
+}
+
 // Criar índices para melhor performance (se não existirem)
 try {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_pedidos_numero ON pedidos_yampi(numero_pedido)`);
@@ -226,6 +256,9 @@ try {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_pedidos_status ON pedidos_yampi(status_pedido_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_pedidos_data ON pedidos_yampi(data_pedido)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_pedidos_cpf ON pedidos_yampi(cliente_cpf)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_itens_atracao ON itens_pedido_yampi(atracao_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_itens_presenca ON itens_pedido_yampi(presenca_confirmada)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_operadores_atracao ON operadores(atracao_id)`);
   console.log('✅ Índices criados/verificados');
 } catch (error) {
   // Índices já existem, ignorar

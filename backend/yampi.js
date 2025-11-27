@@ -134,7 +134,7 @@ function montarInsertPedido(dados) {
   Object.keys(mapeamento).forEach(coluna => {
     if (colunasDisponiveis.has(coluna)) {
       colunas.push(coluna);
-      valores.push(validarValor(mapeamento[coluna]));  // ✅ VALIDAÇÃO AQUI
+      valores.push(validarValor(mapeamento[coluna]));
       placeholders.push('?');
     }
   });
@@ -180,7 +180,7 @@ function montarUpdatePedido(dados) {
   Object.keys(mapeamento).forEach(coluna => {
     if (colunasDisponiveis.has(coluna)) {
       sets.push(`${coluna} = ?`);
-      valores.push(validarValor(mapeamento[coluna]));  // ✅ VALIDAÇÃO AQUI
+      valores.push(validarValor(mapeamento[coluna]));
     }
   });
 
@@ -189,7 +189,7 @@ function montarUpdatePedido(dados) {
   }
 
   const sql = `UPDATE pedidos_yampi SET ${sets.join(', ')} WHERE yampi_order_id = ?`;
-  valores.push(validarValor(dados.yampi_order_id));  // ✅ VALIDAÇÃO AQUI
+  valores.push(validarValor(dados.yampi_order_id));
 
   return { sql, valores };
 }
@@ -348,11 +348,11 @@ async function salvarPedido(pedido) {
 
   if (existe) {
     const { sql, valores } = montarUpdatePedido(dadosPedido);
-    db.prepare(sql).run(valores);  // ✅ SEM SPREAD - passa array direto
+    db.prepare(sql).run(valores);
     dadosPedido.id = existe.id;
   } else {
     const { sql, valores } = montarInsertPedido(dadosPedido);
-    const result = db.prepare(sql).run(valores);  // ✅ SEM SPREAD - passa array direto
+    const result = db.prepare(sql).run(valores);
     dadosPedido.id = result.lastInsertRowid;
   }
 
@@ -382,7 +382,10 @@ async function salvarItemPedido(pedidoId, item) {
     produto_id: null,
     atracao_id: null,
     classificado: 0,
-    data_classificacao: null
+    data_classificacao: null,
+    presenca_confirmada: 0,
+    data_confirmacao_presenca: null,
+    confirmado_por: null
   };
 
   const colunas = [];
@@ -392,13 +395,13 @@ async function salvarItemPedido(pedidoId, item) {
   Object.keys(dadosItem).forEach(coluna => {
     if (colunasDisponiveis.has(coluna)) {
       colunas.push(coluna);
-      valores.push(validarValor(dadosItem[coluna]));  // ✅ VALIDAÇÃO AQUI
+      valores.push(validarValor(dadosItem[coluna]));
       placeholders.push('?');
     }
   });
 
   const sql = `INSERT INTO itens_pedido_yampi (${colunas.join(', ')}) VALUES (${placeholders.join(', ')})`;
-  db.prepare(sql).run(valores);  // ✅ SEM SPREAD - passa array direto
+  db.prepare(sql).run(valores);
 }
 
 async function buscarProdutos(params = {}) {

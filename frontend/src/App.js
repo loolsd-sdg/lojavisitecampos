@@ -64,9 +64,29 @@ function App() {
     delete axios.defaults.headers.common['Authorization'];
   };
 
+  // Se não estiver logado, mostrar tela de login
   if (!token) {
     return <TelaLogin setToken={setToken} setUsuario={setUsuario} setTela={setTela} mostrarMensagem={mostrarMensagem} />;
   }
+
+  // ========== NOVO: Se for usuário de atração, renderizar painel específico ==========
+  if (usuario?.permissao === 'atracao') {
+    return (
+      <div>
+        {mensagem && (
+          <div className={`mensagem ${mensagem.tipo}`}>
+            {mensagem.tipo === 'sucesso' ? '✅' : '❌'} {mensagem.texto}
+          </div>
+        )}
+        <TelaUsuarioAtracao 
+  usuario={usuario} 
+  logout={logout} 
+  mostrarMensagem={mostrarMensagem} 
+/>
+      </div>
+    );
+  }
+  // ========== FIM DO BLOCO NOVO ==========
 
   return (
     <div className="App">
@@ -157,7 +177,10 @@ function App() {
           />
         )}
         {tela === 'operadores' && (
-          <TelaOperadores mostrarMensagem={mostrarMensagem} />
+          <TelaOperadores 
+            atracoes={atracoes}  // ← ADICIONADO
+            mostrarMensagem={mostrarMensagem} 
+          />
         )}
         {tela === 'configuracoes' && (
           <TelaConfiguracoes mostrarMensagem={mostrarMensagem} />
@@ -192,7 +215,14 @@ function TelaLogin({ setToken, setUsuario, setTela, mostrarMensagem }) {
       
       setToken(res.data.token);
       setUsuario(res.data.operador);
-      setTela('nova-venda');
+      
+      // ========== MODIFICADO: Definir tela inicial baseada na permissão ==========
+      if (res.data.operador.permissao === 'atracao') {
+        setTela('dashboard-atracao'); // Será renderizado o PainelAtracao
+      } else {
+        setTela('nova-venda');
+      }
+      // ========== FIM DA MODIFICAÇÃO ==========
       
       mostrarMensagem(`Bem-vindo, ${res.data.operador.nome}!`);
     } catch (error) {
@@ -1424,15 +1454,16 @@ function TelaRelatorioAtracao({ atracaoId, setTela, mostrarMensagem }) {
   );
 }
 
-// ==================== TELA OPERADORES ====================
-function TelaOperadores({ mostrarMensagem }) {
+// ==================== TELA OPERADORES (ATUALIZADO) ====================
+function TelaOperadores({ atracoes, mostrarMensagem }) {  // ← MODIFICADO: adicionado atracoes
   const [operadores, setOperadores] = useState([]);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     username: '',
     password: '',
-    permissao: 'usuario'
+    permissao: 'usuario',
+    atracao_id: ''  // ← ADICIONADO
   });
 
   useEffect(() => {
@@ -1456,7 +1487,7 @@ function TelaOperadores({ mostrarMensagem }) {
       mostrarMensagem('Operador criado com sucesso!');
       carregarOperadores();
       setModoEdicao(false);
-      setFormData({ nome: '', username: '', password: '', permissao: 'usuario' });
+      setFormData({ nome: '', username: '', password: '', permissao: 'usuario', atracao_id: '' });
     } catch (error) {
       mostrarMensagem(error.response?.data?.error || 'Erro ao criar operador', 'erro');
     }
@@ -1521,8 +1552,29 @@ function TelaOperadores({ mostrarMensagem }) {
             >
               <option value="usuario">Usuário</option>
               <option value="admin">Administrador</option>
+              <option value="atracao">Atração</option>  {/* ← ADICIONADO */}
             </select>
           </div>
+
+          {/* ========== NOVO BLOCO: Seleção de atração ========== */}
+          {formData.permissao === 'atracao' && (
+            <div className="form-group">
+              <label>Atração Vinculada *</label>
+              <select
+                value={formData.atracao_id}
+                onChange={(e) => setFormData({...formData, atracao_id: e.target.value})}
+                required
+              >
+                <option value="">Selecione uma atração</option>
+                {atracoes.map(atracao => (
+                  <option key={atracao.id} value={atracao.id}>
+                    {atracao.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {/* ========== FIM DO BLOCO NOVO ========== */}
 
           <button type="submit" className="btn-primary">➕ Criar Operador</button>
         </form>
@@ -1544,6 +1596,7 @@ function TelaOperadores({ mostrarMensagem }) {
               <th>Nome</th>
               <th>Usuário</th>
               <th>Permissão</th>
+              <th>Atração</th>  {/* ← ADICIONADO */}
               <th>Status</th>
               <th>Cadastro</th>
               <th>Ações</th>
@@ -1556,9 +1609,12 @@ function TelaOperadores({ mostrarMensagem }) {
                 <td>{op.username}</td>
                 <td>
                   <span className={`badge badge-${op.permissao}`}>
-                    {op.permissao === 'admin' ? '👑 Admin' : '👤 Usuário'}
+                    {op.permissao === 'admin' && '👑 Admin'}
+                    {op.permissao === 'usuario' && '👤 Usuário'}
+                    {op.permissao === 'atracao' && '🏛️ Atração'}  {/* ← ADICIONADO */}
                   </span>
                 </td>
+                <td>{op.atracao_nome || '-'}</td>  {/* ← ADICIONADO */}
                 <td>{op.ativo ? '✅ Ativo' : '❌ Inativo'}</td>
                 <td>{new Date(op.created_at).toLocaleDateString('pt-BR')}</td>
                 <td>
@@ -1579,6 +1635,441 @@ function TelaOperadores({ mostrarMensagem }) {
     </div>
   );
 }
+// ============= TELA PARA USUÁRIO DE ATRAÇÃO =============
+// Adicione este componente no App.js do frontend
+
+function TelaUsuarioAtracao({ usuario, mostrarMensagem }) {
+  const [atracao, setAtracao] = useState(null);
+  const [relatorio, setRelatorio] = useState(null);
+  const [pedidos, setPedidos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [abaSelecionada, setAbaSelecionada] = useState('relatorio'); // 'relatorio' ou 'pedidos'
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      setLoading(true);
+      
+      // Carregar dados da atração
+      const resAtracao = await axios.get(`${API_URL}/minha-atracao`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setAtracao(resAtracao.data);
+
+      // Carregar relatório
+      await carregarRelatorio();
+
+      // Carregar pedidos
+      await carregarPedidos();
+
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      mostrarMensagem(error.response?.data?.error || 'Erro ao carregar dados', 'erro');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const carregarRelatorio = async () => {
+    try {
+      const params = {};
+      if (dataInicio) params.dataInicio = dataInicio;
+      if (dataFim) params.dataFim = dataFim;
+
+      const res = await axios.get(`${API_URL}/minha-atracao/relatorio`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        params
+      });
+      setRelatorio(res.data);
+    } catch (error) {
+      console.error('Erro ao carregar relatório:', error);
+    }
+  };
+
+  const carregarPedidos = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/minha-atracao/pedidos`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        params: { limit: 50 }
+      });
+      setPedidos(res.data.pedidos || []);
+    } catch (error) {
+      console.error('Erro ao carregar pedidos:', error);
+    }
+  };
+
+  const aplicarFiltro = () => {
+    carregarRelatorio();
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px' }}>
+        <h2>Carregando...</h2>
+      </div>
+    );
+  }
+
+  if (!atracao) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px' }}>
+        <h2>❌ Erro</h2>
+        <p>Você não está vinculado a nenhuma atração.</p>
+        <p>Entre em contato com o administrador.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container">
+      {/* Header com Info da Atração */}
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white', 
+        padding: '30px',
+        borderRadius: '12px',
+        marginBottom: '30px'
+      }}>
+        <h1 style={{ margin: 0, fontSize: '32px' }}>🏛️ {atracao.nome}</h1>
+        <p style={{ margin: '10px 0 0 0', fontSize: '18px', opacity: 0.9 }}>
+          {atracao.descricao || 'Painel da Atração'}
+        </p>
+        {atracao.responsavel && (
+          <p style={{ margin: '5px 0 0 0', fontSize: '14px', opacity: 0.8 }}>
+            Responsável: {atracao.responsavel}
+          </p>
+        )}
+      </div>
+
+      {/* Abas */}
+      <div style={{ marginBottom: '30px', display: 'flex', gap: '10px' }}>
+        <button
+          onClick={() => setAbaSelecionada('relatorio')}
+          style={{
+            padding: '12px 30px',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            background: abaSelecionada === 'relatorio' 
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+              : '#ecf0f1',
+            color: abaSelecionada === 'relatorio' ? 'white' : '#2c3e50',
+            transition: 'all 0.3s'
+          }}
+        >
+          📊 Relatório Financeiro
+        </button>
+        <button
+          onClick={() => setAbaSelecionada('pedidos')}
+          style={{
+            padding: '12px 30px',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            background: abaSelecionada === 'pedidos' 
+              ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+              : '#ecf0f1',
+            color: abaSelecionada === 'pedidos' ? 'white' : '#2c3e50',
+            transition: 'all 0.3s'
+          }}
+        >
+          🛒 Meus Pedidos
+        </button>
+      </div>
+
+      {/* ABA RELATÓRIO */}
+      {abaSelecionada === 'relatorio' && relatorio && (
+        <>
+          {/* Filtros de Data */}
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            marginBottom: '20px',
+            display: 'flex',
+            gap: '15px',
+            alignItems: 'end',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Data Início
+              </label>
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                Data Fim
+              </label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <button
+              onClick={aplicarFiltro}
+              style={{
+                padding: '10px 30px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              🔍 Filtrar
+            </button>
+          </div>
+
+          {/* Cards de Resumo */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            {/* Faturamento Total */}
+            <div style={{
+              background: 'white',
+              padding: '25px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ fontSize: '16px', color: '#7f8c8d', margin: '0 0 15px 0' }}>
+                💰 Faturamento Total
+              </h3>
+              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3498db', margin: '10px 0' }}>
+                R$ {relatorio.resumo.faturamentoTotal.toFixed(2)}
+              </div>
+            </div>
+
+            {/* Comissão */}
+            <div style={{
+              background: 'white',
+              padding: '25px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ fontSize: '16px', color: '#7f8c8d', margin: '0 0 15px 0' }}>
+                💼 Comissão (Plataforma)
+              </h3>
+              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f39c12', margin: '10px 0' }}>
+                R$ {relatorio.resumo.comissaoTotal.toFixed(2)}
+              </div>
+            </div>
+
+            {/* Valor Líquido */}
+            <div style={{
+              background: 'white',
+              padding: '25px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ fontSize: '16px', color: '#7f8c8d', margin: '0 0 15px 0' }}>
+                💵 Valor Líquido (Você)
+              </h3>
+              <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#27ae60', margin: '10px 0' }}>
+                R$ {relatorio.resumo.liquidoTotal.toFixed(2)}
+              </div>
+            </div>
+          </div>
+            {/* Card de Origem dos Pedidos */}
+<div style={{
+  background: 'white',
+  padding: '25px',
+  borderRadius: '12px',
+  boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+  textAlign: 'center'
+}}>
+  <h3 style={{ fontSize: '16px', color: '#7f8c8d', margin: '0 0 15px 0' }}>
+    📊 Origem dos Pedidos
+  </h3>
+  <div style={{ fontSize: '16px', color: '#2c3e50', margin: '10px 0' }}>
+    🛒 Yampi: <strong>{relatorio.resumo.itensYampi || 0}</strong>
+  </div>
+  <div style={{ fontSize: '16px', color: '#2c3e50', margin: '10px 0' }}>
+    🎟️ PDV: <strong>{relatorio.resumo.itensPDV || 0}</strong>
+  </div>
+</div>
+
+          {/* Tabela de Detalhes */}
+          <div style={{ background: 'white', borderRadius: '12px', padding: '25px' }}>
+            <h3 style={{ marginBottom: '20px', color: '#2c3e50' }}>
+              📋 Detalhamento de Vendas ({relatorio.itens.length} itens)
+            </h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white'
+                }}>
+                  <tr>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Data</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Pedido</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Cliente</th>
+                    <th style={{ padding: '15px', textAlign: 'left' }}>Produto</th>
+                    <th style={{ padding: '15px', textAlign: 'center' }}>Origem</th>
+                    <th style={{ padding: '15px', textAlign: 'center' }}>Qtd</th>
+                    <th style={{ padding: '15px', textAlign: 'right' }}>Faturamento</th>
+                    <th style={{ padding: '15px', textAlign: 'right' }}>Comissão</th>
+                    <th style={{ padding: '15px', textAlign: 'right' }}>Líquido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {relatorio.itens.map((item, index) => (
+                    <tr key={index} style={{
+                      borderBottom: '1px solid #ecf0f1',
+                      background: index % 2 === 0 ? 'white' : '#f8f9fa'
+                    }}>
+                      <td style={{ padding: '15px' }}>
+                        {item.data_pedido ? new Date(item.data_pedido).toLocaleDateString('pt-BR') : 'N/A'}
+                      </td>
+                      <td style={{ padding: '15px' }}>#{item.numero_pedido}</td>
+                      <td style={{ padding: '15px', textAlign: 'center' }}>
+  {item.origem === 'yampi' ? (
+    <span style={{
+      padding: '4px 10px',
+      borderRadius: '12px',
+      fontSize: '11px',
+      fontWeight: 'bold',
+      background: '#3498db',
+      color: 'white'
+    }}>
+      🛒 Yampi
+    </span>
+  ) : (
+    <span style={{
+      padding: '4px 10px',
+      borderRadius: '12px',
+      fontSize: '11px',
+      fontWeight: 'bold',
+      background: '#27ae60',
+      color: 'white'
+    }}>
+      🎟️ PDV
+    </span>
+  )}
+</td>
+                      <td style={{ padding: '15px' }}>{item.cliente_nome}</td>
+                      <td style={{ padding: '15px' }}>{item.produto_nome || item.produto_yampi_nome}</td>
+                      <td style={{ padding: '15px', textAlign: 'center' }}>{item.quantidade}</td>
+                      <td style={{ padding: '15px', textAlign: 'right', color: '#3498db', fontWeight: 'bold' }}>
+                        R$ {item.faturamento.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '15px', textAlign: 'right', color: '#f39c12', fontWeight: 'bold' }}>
+                        R$ {item.comissao.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '15px', textAlign: 'right', color: '#27ae60', fontWeight: 'bold' }}>
+                        R$ {item.liquido.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ABA PEDIDOS */}
+      {abaSelecionada === 'pedidos' && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '25px' }}>
+          <h3 style={{ marginBottom: '20px', color: '#2c3e50' }}>
+            🛒 Meus Pedidos ({pedidos.length})
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white'
+              }}>
+                <tr>
+                  <th style={{ padding: '15px', textAlign: 'left' }}>Pedido</th>
+                  <th style={{ padding: '15px', textAlign: 'left' }}>Data</th>
+                  <th style={{ padding: '15px', textAlign: 'left' }}>Cliente</th>
+                  <th style={{ padding: '15px', textAlign: 'center' }}>Itens</th>
+                  <th style={{ padding: '15px', textAlign: 'center' }}>Produtos</th>
+                  <th style={{ padding: '15px', textAlign: 'right' }}>Valor Total</th>
+                  <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
+                  <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
+                  <th style={{ padding: '15px', textAlign: 'center' }}>Origem</th> {/* ADICIONAR */}
+                </tr>
+              </thead>
+              <tbody>
+                {pedidos.map((pedido, index) => (
+                  <tr key={pedido.id} style={{
+                    borderBottom: '1px solid #ecf0f1',
+                    background: index % 2 === 0 ? 'white' : '#f8f9fa'
+                  }}>
+                    <td style={{ padding: '15px', fontWeight: 'bold' }}>#{pedido.numero_pedido}</td>
+                    <td style={{ padding: '15px' }}>
+                      {new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td style={{ padding: '15px' }}>{pedido.cliente_nome}</td>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>{pedido.total_itens}</td>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>{pedido.total_produtos}</td>
+                    <td style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>
+  {pedido.origem === 'yampi' ? '🛒 Yampi' : '🎟️ PDV'}
+</td>
+                      R$ {parseFloat(pedido.valor_total_itens || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '15px' }}>
+                      <span style={{
+                        padding: '5px 12px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        background: '#27ae60',
+                        color: 'white'
+                      }}>
+                        {pedido.status_financeiro}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ==================== TELA CONFIGURAÇÕES ====================
 function TelaConfiguracoes({ mostrarMensagem }) {
@@ -1703,3 +2194,5 @@ function TelaConfiguracoes({ mostrarMensagem }) {
 }
 
 export default App;
+
+

@@ -41,6 +41,14 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Middleware para verificar se é usuário de atração
+const requireAtracao = (req, res, next) => {
+  if (req.user.permissao !== 'atracao') {
+    return res.status(403).json({ error: 'Acesso negado. Apenas usuários de atração.' });
+  }
+  next();
+};
+
 // ============= ROTAS DE AUTENTICAÇÃO =============
 
 // Login
@@ -65,7 +73,8 @@ app.post('/api/login', (req, res) => {
         id: operador.id, 
         username: operador.username, 
         nome: operador.nome,
-        permissao: operador.permissao || 'usuario'
+        permissao: operador.permissao || 'usuario',
+        atracao_id: operador.atracao_id || null
       },
       JWT_SECRET,
       { expiresIn: '8h' }
@@ -77,9 +86,499 @@ app.post('/api/login', (req, res) => {
         id: operador.id,
         nome: operador.nome,
         username: operador.username,
-        permissao: operador.permissao || 'usuario'
+        permissao: operador.permissao || 'usuario',
+        atracao_id: operador.atracao_id || null
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= ROTAS PARA USUÁRIOS DE ATRAÇÃO =============
+
+// GET /api/minha-atracao - Ver dados da própria atração
+app.get('/api/minha-atracao', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const atracaoId = req.user.atracao_id;
+    
+    if (!atracaoId) {
+      return res.status(400).json({ error: 'Usuário não vinculado a nenhuma atração' });
+    }
+
+    const atracao = db.prepare('SELECT * FROM atracoes WHERE id = ?').get(atracaoId);
+    
+    if (!atracao) {
+      return res.status(404).json({ error: 'Atração não encontrada' });
+    }
+
+    res.json(atracao);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/minha-atracao/pedidos - Listar TODOS os pedidos (Yampi + PDV)
+app.get('/api/minha-atracao/pedidos', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const atracaoId = req.user.atracao_id;
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+
+    if (!atracaoId) {
+      return res.status(400).json({ error: 'Usuário não vinculado a nenhuma atração' });
+    }
+
+    // ========== PEDIDOS YAMPI ==========
+    const pedidosYampi = db.prepare(`
+      SELECT DISTINCT
+        p.id,
+        p.numero_pedido,
+        p.data_pedido as data,
+        p.cliente_nome,
+        p.valor_total,
+        p.status_financeiro,
+        COUNT(DISTINCT i.id) as total_itens,
+        SUM(i.quantidade) as total_produtos,
+        SUM(i.valor_total) as valor_total_itens,
+        'yampi' as origem
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON i.pedido_yampi_id = p.id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+      GROUP BY p.id
+    `).all(atracaoId);
+
+    // ========== VENDAS PDV ==========
+    const vendasPDV = db.prepare(`
+      SELECT 
+        v.id,
+        v.codigo_venda as numero_pedido,
+        v.created_at as data,
+        v.nome_cliente as cliente_nome,
+        v.valor_total,
+        'pago' as status_financeiro,
+        1 as total_itens,
+        v.quantidade_pessoas as total_produtos,
+        v.valor_total as valor_total_itens,
+        'pdv' as origem
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).all(atracaoId);
+
+    // ========== UNIFICAR E ORDENAR ==========
+    const todosPedidos = [...pedidosYampi, ...vendasPDV];
+    todosPedidos.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    // ========== PAGINAÇÃO ==========
+    const totalPedidos = todosPedidos.length;
+    const pedidosPaginados = todosPedidos.slice(offset, offset + limit);
+
+    res.json({
+      pedidos: pedidosPaginados,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalPedidos,
+        totalPages: Math.ceil(totalPedidos / limit)
+      },
+      resumo: {
+        totalYampi: pedidosYampi.length,
+        totalPDV: vendasPDV.length
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao listar pedidos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/minha-atracao/relatorio - Relatório UNIFICADO (Yampi + PDV)
+app.get('/api/minha-atracao/relatorio', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const atracaoId = req.user.atracao_id;
+    const { dataInicio, dataFim } = req.query;
+
+    if (!atracaoId) {
+      return res.status(400).json({ error: 'Usuário não vinculado a nenhuma atração' });
+    }
+
+    const atracao = db.prepare('SELECT * FROM atracoes WHERE id = ?').get(atracaoId);
+    
+    if (!atracao) {
+      return res.status(404).json({ error: 'Atração não encontrada' });
+    }
+
+    // ========== BUSCAR PEDIDOS YAMPI ==========
+    let queryYampi = `
+      SELECT 
+        i.id,
+        i.quantidade,
+        i.valor_total,
+        p.data_pedido as data,
+        p.numero_pedido as numero,
+        p.cliente_nome,
+        prod.nome as produto_nome,
+        prod.tipo_comissao,
+        prod.valor_comissao,
+        'yampi' as origem
+      FROM itens_pedido_yampi i
+      LEFT JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+      LEFT JOIN produtos prod ON i.produto_id = prod.id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `;
+
+    const paramsYampi = [atracaoId];
+
+    if (dataInicio && dataFim) {
+      queryYampi += ` AND DATE(p.data_pedido) BETWEEN ? AND ?`;
+      paramsYampi.push(dataInicio, dataFim);
+    } else if (dataInicio) {
+      queryYampi += ` AND DATE(p.data_pedido) >= ?`;
+      paramsYampi.push(dataInicio);
+    }
+
+    const itensYampi = db.prepare(queryYampi).all(...paramsYampi);
+
+    // ========== BUSCAR VENDAS PDV ==========
+    let queryPDV = `
+      SELECT 
+        v.id,
+        v.quantidade_pessoas as quantidade,
+        v.valor_total,
+        v.created_at as data,
+        v.codigo_venda as numero,
+        v.nome_cliente as cliente_nome,
+        v.produto_nome,
+        p.tipo_comissao,
+        p.valor_comissao,
+        'pdv' as origem
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `;
+
+    const paramsPDV = [atracaoId];
+
+    if (dataInicio && dataFim) {
+      queryPDV += ` AND DATE(v.created_at) BETWEEN ? AND ?`;
+      paramsPDV.push(dataInicio, dataFim);
+    } else if (dataInicio) {
+      queryPDV += ` AND DATE(v.created_at) >= ?`;
+      paramsPDV.push(dataInicio);
+    }
+
+    const itensPDV = db.prepare(queryPDV).all(...paramsPDV);
+
+    // ========== UNIFICAR DADOS ==========
+    const todosItens = [...itensYampi, ...itensPDV];
+
+    // ========== CALCULAR TOTAIS ==========
+    let faturamentoTotal = 0;
+    let comissaoTotal = 0;
+
+    const itensComCalculo = todosItens.map(item => {
+      const faturamento = parseFloat(item.valor_total || 0);
+      let comissao = 0;
+
+      if (item.tipo_comissao === 'percentual') {
+        comissao = (faturamento * parseFloat(item.valor_comissao || 0)) / 100;
+      } else if (item.tipo_comissao === 'fixo') {
+        comissao = parseFloat(item.valor_comissao || 0) * parseInt(item.quantidade || 1);
+      }
+
+      const liquido = faturamento - comissao;
+
+      faturamentoTotal += faturamento;
+      comissaoTotal += comissao;
+
+      return {
+        id: item.id,
+        data_pedido: item.data,
+        numero_pedido: item.numero,
+        cliente_nome: item.cliente_nome,
+        produto_nome: item.produto_nome,
+        quantidade: item.quantidade,
+        origem: item.origem,
+        faturamento,
+        comissao,
+        liquido,
+        tipo_comissao: item.tipo_comissao,
+        valor_comissao: item.valor_comissao
+      };
+    });
+
+    // Ordenar por data
+    itensComCalculo.sort((a, b) => new Date(b.data_pedido) - new Date(a.data_pedido));
+
+    const liquidoTotal = faturamentoTotal - comissaoTotal;
+
+    res.json({
+      atracao,
+      resumo: {
+        faturamentoTotal,
+        comissaoTotal,
+        liquidoTotal,
+        totalItens: itensComCalculo.length,
+        itensYampi: itensYampi.length,
+        itensPDV: itensPDV.length
+      },
+      itens: itensComCalculo,
+      periodo: {
+        dataInicio: dataInicio || null,
+        dataFim: dataFim || null
+      }
+    });
+  } catch (error) {
+    console.error('Erro no relatório:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Detalhes de um pedido específico da atração
+app.get('/api/atracao/pedidos/:id', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { atracao_id } = req.user;
+
+    const pedido = db.prepare('SELECT * FROM pedidos_yampi WHERE id = ?').get(id);
+    
+    if (!pedido) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    // Buscar apenas os itens da atração do usuário
+    const itens = db.prepare(`
+      SELECT i.*, 
+             p.nome as produto_interno_nome,
+             o.nome as confirmado_por_nome
+      FROM itens_pedido_yampi i
+      LEFT JOIN produtos p ON i.produto_id = p.id
+      LEFT JOIN operadores o ON i.confirmado_por = o.id
+      WHERE i.pedido_yampi_id = ? AND i.atracao_id = ?
+    `).all(id, atracao_id);
+
+    if (itens.length === 0) {
+      return res.status(403).json({ error: 'Pedido não pertence a esta atração' });
+    }
+
+    res.json({ pedido, itens });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Confirmar presença de um item
+app.post('/api/atracao/confirmar-presenca/:itemId', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { atracao_id, id: operador_id } = req.user;
+
+    // Verificar se o item pertence à atração do usuário
+    const item = db.prepare(`
+      SELECT * FROM itens_pedido_yampi 
+      WHERE id = ? AND atracao_id = ? AND classificado = 1
+    `).get(itemId, atracao_id);
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item não encontrado ou não pertence a esta atração' });
+    }
+
+    if (item.presenca_confirmada === 1) {
+      return res.status(400).json({ error: 'Presença já foi confirmada para este item' });
+    }
+
+    // Confirmar presença
+    db.prepare(`
+      UPDATE itens_pedido_yampi SET
+        presenca_confirmada = 1,
+        data_confirmacao_presenca = CURRENT_TIMESTAMP,
+        confirmado_por = ?
+      WHERE id = ?
+    `).run(operador_id, itemId);
+
+    res.json({ message: 'Presença confirmada com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancelar confirmação de presença
+app.post('/api/atracao/cancelar-presenca/:itemId', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { atracao_id } = req.user;
+
+    // Verificar se o item pertence à atração do usuário
+    const item = db.prepare(`
+      SELECT * FROM itens_pedido_yampi 
+      WHERE id = ? AND atracao_id = ?
+    `).get(itemId, atracao_id);
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item não encontrado ou não pertence a esta atração' });
+    }
+
+    // Cancelar confirmação
+    db.prepare(`
+      UPDATE itens_pedido_yampi SET
+        presenca_confirmada = 0,
+        data_confirmacao_presenca = NULL,
+        confirmado_por = NULL
+      WHERE id = ?
+    `).run(itemId);
+
+    res.json({ message: 'Confirmação de presença cancelada' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Relatório financeiro da atração (antigo - mantido para compatibilidade)
+app.get('/api/atracao/relatorio-financeiro', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { atracao_id } = req.user;
+    const { dataInicio, dataFim } = req.query;
+
+    // Buscar informações da atração
+    const atracao = db.prepare('SELECT * FROM atracoes WHERE id = ?').get(atracao_id);
+
+    let query = `
+      SELECT 
+        i.id,
+        i.produto_yampi_nome,
+        i.quantidade,
+        i.valor_total,
+        i.presenca_confirmada,
+        i.data_confirmacao_presenca,
+        i.data_classificacao,
+        p.numero_pedido,
+        p.cliente_nome,
+        p.data_pedido,
+        prod.nome as produto_interno_nome,
+        prod.tipo_comissao,
+        prod.valor_comissao
+      FROM itens_pedido_yampi i
+      INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+      LEFT JOIN produtos prod ON i.produto_id = prod.id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `;
+
+    const params = [atracao_id];
+
+    if (dataInicio) {
+      query += ` AND DATE(p.data_pedido) >= DATE(?)`;
+      params.push(dataInicio);
+    }
+
+    if (dataFim) {
+      query += ` AND DATE(p.data_pedido) <= DATE(?)`;
+      params.push(dataFim);
+    }
+
+    query += ` ORDER BY p.data_pedido DESC`;
+
+    const itens = db.prepare(query).all(...params);
+
+    // Calcular totais
+    let faturamentoTotal = 0;
+    let comissaoTotal = 0;
+    let presencasConfirmadas = 0;
+    let totalPessoas = 0;
+
+    itens.forEach(item => {
+      faturamentoTotal += item.valor_total;
+      totalPessoas += item.quantidade;
+
+      if (item.presenca_confirmada) {
+        presencasConfirmadas += item.quantidade;
+      }
+
+      if (item.tipo_comissao && item.valor_comissao) {
+        if (item.tipo_comissao === 'percentual') {
+          comissaoTotal += (item.valor_total * item.valor_comissao) / 100;
+        } else {
+          comissaoTotal += item.valor_comissao * item.quantidade;
+        }
+      }
+    });
+
+    const valorLiquido = faturamentoTotal - comissaoTotal;
+
+    res.json({
+      atracao,
+      resumo: {
+        faturamentoTotal,
+        comissaoTotal,
+        valorLiquido,
+        totalItens: itens.length,
+        totalPessoas,
+        presencasConfirmadas,
+        taxaConfirmacao: totalPessoas > 0 ? (presencasConfirmadas / totalPessoas * 100).toFixed(1) : 0
+      },
+      itens
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dashboard da atração (estatísticas rápidas)
+app.get('/api/atracao/dashboard', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { atracao_id } = req.user;
+
+    const hoje = new Date().toISOString().split('T')[0];
+
+    // Estatísticas gerais
+    const stats = {
+      total_pedidos: db.prepare(`
+        SELECT COUNT(DISTINCT p.id) as count
+        FROM pedidos_yampi p
+        INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
+        WHERE i.atracao_id = ? AND i.classificado = 1
+      `).get(atracao_id).count,
+
+      pedidos_hoje: db.prepare(`
+        SELECT COUNT(DISTINCT p.id) as count
+        FROM pedidos_yampi p
+        INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
+        WHERE i.atracao_id = ? AND i.classificado = 1
+        AND DATE(p.data_pedido) = DATE(?)
+      `).get(atracao_id, hoje).count,
+
+      presencas_hoje: db.prepare(`
+        SELECT SUM(i.quantidade) as total
+        FROM itens_pedido_yampi i
+        INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+        WHERE i.atracao_id = ? 
+        AND i.presenca_confirmada = 1
+        AND DATE(i.data_confirmacao_presenca) = DATE(?)
+      `).get(atracao_id, hoje).total || 0,
+
+      pendentes_confirmacao: db.prepare(`
+        SELECT COUNT(*) as count
+        FROM itens_pedido_yampi i
+        WHERE i.atracao_id = ? 
+        AND i.classificado = 1
+        AND i.presenca_confirmada = 0
+      `).get(atracao_id).count,
+
+      total_pessoas: db.prepare(`
+        SELECT SUM(i.quantidade) as total
+        FROM itens_pedido_yampi i
+        WHERE i.atracao_id = ? AND i.classificado = 1
+      `).get(atracao_id).total || 0,
+
+      pessoas_confirmadas: db.prepare(`
+        SELECT SUM(i.quantidade) as total
+        FROM itens_pedido_yampi i
+        WHERE i.atracao_id = ? 
+        AND i.presenca_confirmada = 1
+      `).get(atracao_id).total || 0
+    };
+
+    res.json(stats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -100,7 +599,7 @@ app.get('/api/atracoes', authenticateToken, requireAdmin, (req, res) => {
 // Criar atração
 app.post('/api/atracoes', authenticateToken, requireAdmin, (req, res) => {
   try {
-    const { nome, descricao, responsavel, telefone, email } = req.body;
+    const { nome, descricao, responsavel, telefone, email, criar_usuario, username, password } = req.body;
 
     if (!nome) {
       return res.status(400).json({ error: 'Nome é obrigatório' });
@@ -111,8 +610,32 @@ app.post('/api/atracoes', authenticateToken, requireAdmin, (req, res) => {
       VALUES (?, ?, ?, ?, ?)
     `).run(nome, descricao || '', responsavel || '', telefone || '', email || '');
 
+    const atracaoId = result.lastInsertRowid;
+
+    // Se solicitado, criar usuário para a atração
+    if (criar_usuario && username && password) {
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      
+      try {
+        db.prepare(`
+          INSERT INTO operadores (nome, username, password, permissao, atracao_id)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          `Usuário ${nome}`,
+          username,
+          hashedPassword,
+          'atracao',
+          atracaoId
+        );
+      } catch (error) {
+        // Se falhar ao criar usuário, deletar a atração criada
+        db.prepare('DELETE FROM atracoes WHERE id = ?').run(atracaoId);
+        throw new Error('Erro ao criar usuário: ' + error.message);
+      }
+    }
+
     res.status(201).json({ 
-      id: result.lastInsertRowid, 
+      id: atracaoId, 
       message: 'Atração criada com sucesso' 
     });
   } catch (error) {
@@ -149,7 +672,7 @@ app.delete('/api/atracoes/:id', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
-// Relatório financeiro de uma atração
+// Relatório financeiro de uma atração (ADMIN)
 app.get('/api/atracoes/:id/relatorio', authenticateToken, requireAdmin, (req, res) => {
   try {
     const { id } = req.params;
@@ -168,6 +691,8 @@ app.get('/api/atracoes/:id/relatorio', authenticateToken, requireAdmin, (req, re
         i.produto_yampi_nome,
         i.quantidade,
         i.valor_total,
+        i.presenca_confirmada,
+        i.data_confirmacao_presenca,
         i.data_classificacao,
         p.numero_pedido,
         p.cliente_nome,
@@ -200,9 +725,16 @@ app.get('/api/atracoes/:id/relatorio', authenticateToken, requireAdmin, (req, re
     // Calcular totais
     let faturamentoTotal = 0;
     let comissaoTotal = 0;
+    let presencasConfirmadas = 0;
+    let totalPessoas = 0;
 
     itens.forEach(item => {
       faturamentoTotal += item.valor_total;
+      totalPessoas += item.quantidade;
+
+      if (item.presenca_confirmada) {
+        presencasConfirmadas += item.quantidade;
+      }
 
       if (item.tipo_comissao && item.valor_comissao) {
         if (item.tipo_comissao === 'percentual') {
@@ -221,7 +753,10 @@ app.get('/api/atracoes/:id/relatorio', authenticateToken, requireAdmin, (req, re
         faturamentoTotal,
         comissaoTotal,
         valorLiquido,
-        totalItens: itens.length
+        totalItens: itens.length,
+        totalPessoas,
+        presencasConfirmadas,
+        taxaConfirmacao: totalPessoas > 0 ? (presencasConfirmadas / totalPessoas * 100).toFixed(1) : 0
       },
       itens
     });
@@ -457,7 +992,13 @@ app.post('/api/configuracoes/testar-whatsapp', authenticateToken, requireAdmin, 
 // Listar operadores (APENAS ADMIN)
 app.get('/api/operadores', authenticateToken, requireAdmin, (req, res) => {
   try {
-    const operadores = db.prepare('SELECT id, nome, username, permissao, ativo, created_at FROM operadores ORDER BY nome').all();
+    const operadores = db.prepare(`
+      SELECT o.id, o.nome, o.username, o.permissao, o.atracao_id, o.ativo, o.created_at,
+             a.nome as atracao_nome
+      FROM operadores o
+      LEFT JOIN atracoes a ON o.atracao_id = a.id
+      ORDER BY o.nome
+    `).all();
     res.json(operadores);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -467,19 +1008,28 @@ app.get('/api/operadores', authenticateToken, requireAdmin, (req, res) => {
 // Criar operador (APENAS ADMIN)
 app.post('/api/operadores', authenticateToken, requireAdmin, (req, res) => {
   try {
-    const { nome, username, password, permissao } = req.body;
+    const { nome, username, password, permissao, atracao_id } = req.body;
 
     if (!nome || !username || !password) {
       return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
 
+    // Se for usuário de atração, atracao_id é obrigatório
+    if (permissao === 'atracao' && !atracao_id) {
+      return res.status(400).json({ error: 'Atração é obrigatória para usuários de atração' });
+    }
+
     const hashedPassword = bcrypt.hashSync(password, 10);
 
-    const result = db.prepare('INSERT INTO operadores (nome, username, password, permissao) VALUES (?, ?, ?, ?)').run(
+    const result = db.prepare(`
+      INSERT INTO operadores (nome, username, password, permissao, atracao_id) 
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
       nome,
       username,
       hashedPassword,
-      permissao || 'usuario'
+      permissao || 'usuario',
+      atracao_id || null
     );
 
     res.status(201).json({ id: result.lastInsertRowid, message: 'Operador criado com sucesso' });
@@ -845,7 +1395,7 @@ app.post('/api/vendas/:id/reenviar-whatsapp', authenticateToken, async (req, res
 // ============= ROTA DE STATUS =============
 
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'online', message: 'PDV Visite Campos API com Yampi' });
+  res.json({ status: 'online', message: 'PDV Visite Campos API com Yampi + Painel de Atrações' });
 });
 
 // Iniciar servidor
@@ -854,6 +1404,7 @@ app.listen(PORT, () => {
   ╔════════════════════════════════════════╗
   ║   🎫 PDV VISITE CAMPOS - Backend      ║
   ║   + Integração Yampi 🛒               ║
+  ║   + Painel de Atrações 🏛️             ║
   ║   Servidor rodando na porta ${PORT}      ║
   ╚════════════════════════════════════════╝
   `);
