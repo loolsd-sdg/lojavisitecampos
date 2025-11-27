@@ -335,6 +335,87 @@ app.get('/api/minha-atracao/relatorio', authenticateToken, requireAtracao, (req,
   }
 });
 
+// Listar pedidos da atração (Yampi + PDV)
+app.get('/api/atracao/pedidos', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const atracaoId = req.user.atracao_id;
+    const { status } = req.query;
+
+    if (!atracaoId) {
+      return res.status(400).json({ error: 'Usuário não vinculado a nenhuma atração' });
+    }
+
+    // ========== PEDIDOS YAMPI ==========
+    let queryYampi = `
+      SELECT DISTINCT
+        p.id,
+        p.numero_pedido,
+        p.data_pedido as data,
+        p.cliente_nome,
+        p.cliente_email,
+        p.cliente_telefone,
+        p.valor_total,
+        p.status_financeiro,
+        p.status_pedido,
+        COUNT(DISTINCT i.id) as total_itens,
+        SUM(i.quantidade) as total_produtos,
+        SUM(i.valor_total) as valor_total_itens,
+        'yampi' as origem
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON i.pedido_yampi_id = p.id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `;
+
+    const paramsYampi = [atracaoId];
+
+    if (status && status !== 'todos') {
+      queryYampi += ` AND p.status_financeiro = ?`;
+      paramsYampi.push(status);
+    }
+
+    queryYampi += ` GROUP BY p.id`;
+
+    const pedidosYampi = db.prepare(queryYampi).all(...paramsYampi);
+
+    // ========== VENDAS PDV ==========
+    const vendasPDV = db.prepare(`
+      SELECT 
+        v.id,
+        v.codigo_venda as numero_pedido,
+        v.created_at as data,
+        v.nome_cliente as cliente_nome,
+        '' as cliente_email,
+        v.telefone_cliente as cliente_telefone,
+        v.valor_total,
+        'pago' as status_financeiro,
+        'pago' as status_pedido,
+        1 as total_itens,
+        v.quantidade_pessoas as total_produtos,
+        v.valor_total as valor_total_itens,
+        'pdv' as origem
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).all(atracaoId);
+
+    // ========== UNIFICAR E ORDENAR ==========
+    const todosPedidos = [...pedidosYampi, ...vendasPDV];
+    todosPedidos.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+    res.json({
+      pedidos: todosPedidos,
+      resumo: {
+        totalYampi: pedidosYampi.length,
+        totalPDV: vendasPDV.length,
+        total: todosPedidos.length
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao listar pedidos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Detalhes de um pedido específico da atração
 app.get('/api/atracao/pedidos/:id', authenticateToken, requireAtracao, (req, res) => {
   try {
@@ -530,52 +611,83 @@ app.get('/api/atracao/dashboard', authenticateToken, requireAtracao, (req, res) 
 
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Estatísticas gerais
+    // ========== PEDIDOS YAMPI ==========
+    const pedidosYampi = db.prepare(`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `).get(atracao_id).count;
+
+    const pedidosYampiHoje = db.prepare(`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+      AND DATE(p.data_pedido) = DATE(?)
+    `).get(atracao_id, hoje).count;
+
+    const pessoasYampi = db.prepare(`
+      SELECT SUM(i.quantidade) as total
+      FROM itens_pedido_yampi i
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `).get(atracao_id).total || 0;
+
+    const pessoasYampiConfirmadas = db.prepare(`
+      SELECT SUM(i.quantidade) as total
+      FROM itens_pedido_yampi i
+      WHERE i.atracao_id = ? 
+      AND i.presenca_confirmada = 1
+    `).get(atracao_id).total || 0;
+
+    const presencasYampiHoje = db.prepare(`
+      SELECT SUM(i.quantidade) as total
+      FROM itens_pedido_yampi i
+      INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+      WHERE i.atracao_id = ? 
+      AND i.presenca_confirmada = 1
+      AND DATE(i.data_confirmacao_presenca) = DATE(?)
+    `).get(atracao_id, hoje).total || 0;
+
+    const pendenteYampi = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM itens_pedido_yampi i
+      WHERE i.atracao_id = ? 
+      AND i.classificado = 1
+      AND i.presenca_confirmada = 0
+    `).get(atracao_id).count;
+
+    // ========== VENDAS PDV ==========
+    const vendasPDV = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).get(atracao_id).count;
+
+    const vendasPDVHoje = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+      AND DATE(v.created_at) = DATE(?)
+    `).get(atracao_id, hoje).count;
+
+    const pessoasPDV = db.prepare(`
+      SELECT SUM(v.quantidade_pessoas) as total
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).get(atracao_id).total || 0;
+
+    // ========== UNIFICAR ESTATÍSTICAS ==========
     const stats = {
-      total_pedidos: db.prepare(`
-        SELECT COUNT(DISTINCT p.id) as count
-        FROM pedidos_yampi p
-        INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
-        WHERE i.atracao_id = ? AND i.classificado = 1
-      `).get(atracao_id).count,
-
-      pedidos_hoje: db.prepare(`
-        SELECT COUNT(DISTINCT p.id) as count
-        FROM pedidos_yampi p
-        INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
-        WHERE i.atracao_id = ? AND i.classificado = 1
-        AND DATE(p.data_pedido) = DATE(?)
-      `).get(atracao_id, hoje).count,
-
-      presencas_hoje: db.prepare(`
-        SELECT SUM(i.quantidade) as total
-        FROM itens_pedido_yampi i
-        INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
-        WHERE i.atracao_id = ? 
-        AND i.presenca_confirmada = 1
-        AND DATE(i.data_confirmacao_presenca) = DATE(?)
-      `).get(atracao_id, hoje).total || 0,
-
-      pendentes_confirmacao: db.prepare(`
-        SELECT COUNT(*) as count
-        FROM itens_pedido_yampi i
-        WHERE i.atracao_id = ? 
-        AND i.classificado = 1
-        AND i.presenca_confirmada = 0
-      `).get(atracao_id).count,
-
-      total_pessoas: db.prepare(`
-        SELECT SUM(i.quantidade) as total
-        FROM itens_pedido_yampi i
-        WHERE i.atracao_id = ? AND i.classificado = 1
-      `).get(atracao_id).total || 0,
-
-      pessoas_confirmadas: db.prepare(`
-        SELECT SUM(i.quantidade) as total
-        FROM itens_pedido_yampi i
-        WHERE i.atracao_id = ? 
-        AND i.presenca_confirmada = 1
-      `).get(atracao_id).total || 0
+      total_pedidos: pedidosYampi + vendasPDV,
+      pedidos_hoje: pedidosYampiHoje + vendasPDVHoje,
+      presencas_hoje: presencasYampiHoje,
+      pendentes_confirmacao: pendenteYampi,
+      total_pessoas: pessoasYampi + pessoasPDV,
+      pessoas_confirmadas: pessoasYampiConfirmadas
     };
 
     res.json(stats);
