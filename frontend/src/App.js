@@ -495,6 +495,7 @@ function TelaNovaVenda({ produtos, usuario, mostrarMensagem }) {
 function TelaHistorico() {
   const [vendas, setVendas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloadando, setDownloadando] = useState(null);
 
   useEffect(() => {
     carregarVendas();
@@ -508,6 +509,28 @@ function TelaHistorico() {
       console.error('Erro ao carregar vendas:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const baixarIngresso = async (venda) => {
+    setDownloadando(venda.id);
+    try {
+      const response = await axios.get(`${API_URL}/vendas/${venda.id}/imagem`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'image/jpeg' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ingresso_${venda.codigo_venda}.jpg`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao baixar ingresso:', error);
+      alert('Erro ao baixar o ingresso. Tente novamente.');
+    } finally {
+      setDownloadando(null);
     }
   };
 
@@ -537,6 +560,7 @@ function TelaHistorico() {
                 <th>Vendedor</th>
                 <th>Data/Hora</th>
                 <th>WhatsApp</th>
+                <th>Ingresso</th>
               </tr>
             </thead>
             <tbody>
@@ -553,6 +577,16 @@ function TelaHistorico() {
                     {venda.telefone_cliente ? (
                       venda.whatsapp_enviado ? '✅' : '❌'
                     ) : '-'}
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => baixarIngresso(venda)}
+                      className="btn-download-ingresso"
+                      disabled={downloadando === venda.id}
+                      title="Baixar ingresso"
+                    >
+                      {downloadando === venda.id ? '⏳' : '⬇️ Baixar'}
+                    </button>
                   </td>
                 </tr>
               ))}

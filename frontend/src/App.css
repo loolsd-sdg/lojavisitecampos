@@ -1960,3 +1960,29 @@ tbody td {
     max-width: 100%;
   }
 }
+/* ========== BOTÃO DOWNLOAD INGRESSO ========== */
+.btn-download-ingresso {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+}
+
+.btn-download-ingresso:hover:not(:disabled) {
+  background: linear-gradient(135deg, #219a52, #27ae60);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+}
+
+.btn-download-ingresso:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
