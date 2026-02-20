@@ -1244,11 +1244,20 @@ function TelaClassificacao({ produtos, atracoes, mostrarMensagem }) {
     }
 
     try {
-      await axios.put(`${API_URL}/yampi/itens/${itemId}/classificar`, classificacao);
-      mostrarMensagem('Item classificado com sucesso!');
+      const response = await axios.put(`${API_URL}/yampi/itens/${itemId}/classificar`, classificacao);
+      
+      // Mostrar mensagem com detalhes da classificação em cascata
+      if (response.data.classificadosAutomaticamente > 0) {
+        mostrarMensagem(response.data.mensagemCompleta);
+      } else {
+        mostrarMensagem('Item classificado com sucesso!');
+      }
+      
       carregarItens();
     } catch (error) {
-      mostrarMensagem('Erro ao classificar item', 'erro');
+      console.error('Erro ao classificar:', error);
+      const mensagemErro = error.response?.data?.error || error.message || 'Erro ao classificar item';
+      mostrarMensagem(mensagemErro, 'erro');
     }
   };
 
@@ -1707,6 +1716,36 @@ function TelaUsuarioAtracao({ usuario, mostrarMensagem }) {
     carregarRelatorio();
   };
 
+  const confirmarTodosItens = async (pedidoId, origem) => {
+    if (!window.confirm('Confirmar presença de TODOS os itens deste pedido?')) return;
+
+    try {
+      await axios.post(`${API_URL}/minha-atracao/confirmar-todos/${pedidoId}`, 
+        { origem },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      mostrarMensagem('✅ Todos os itens confirmados com sucesso!');
+      carregarPedidos();
+    } catch (error) {
+      mostrarMensagem(error.response?.data?.error || 'Erro ao confirmar itens', 'erro');
+    }
+  };
+
+  const desconfirmarTodosItens = async (pedidoId, origem) => {
+    if (!window.confirm('Cancelar confirmação de TODOS os itens deste pedido?')) return;
+
+    try {
+      await axios.post(`${API_URL}/minha-atracao/desconfirmar-todos/${pedidoId}`,
+        { origem },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      mostrarMensagem('Confirmações canceladas');
+      carregarPedidos();
+    } catch (error) {
+      mostrarMensagem('Erro ao cancelar confirmações', 'erro');
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '60px' }}>
@@ -2007,9 +2046,29 @@ function TelaUsuarioAtracao({ usuario, mostrarMensagem }) {
       {/* ABA PEDIDOS */}
       {abaSelecionada === 'pedidos' && (
         <div style={{ background: 'white', borderRadius: '12px', padding: '25px' }}>
-          <h3 style={{ marginBottom: '20px', color: '#2c3e50' }}>
-            🛒 Meus Pedidos ({pedidos.length})
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ margin: 0, color: '#2c3e50' }}>
+              🛒 Meus Pedidos ({pedidos.length})
+            </h3>
+            <button
+              onClick={carregarPedidos}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              🔄 Atualizar
+            </button>
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{
@@ -2024,8 +2083,9 @@ function TelaUsuarioAtracao({ usuario, mostrarMensagem }) {
                   <th style={{ padding: '15px', textAlign: 'center' }}>Produtos</th>
                   <th style={{ padding: '15px', textAlign: 'right' }}>Valor Total</th>
                   <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
-                  <th style={{ padding: '15px', textAlign: 'left' }}>Status</th>
-                  <th style={{ padding: '15px', textAlign: 'center' }}>Origem</th> {/* ADICIONAR */}
+                  <th style={{ padding: '15px', textAlign: 'center' }}>Confirmações</th>
+                  <th style={{ padding: '15px', textAlign: 'center' }}>Origem</th>
+                  <th style={{ padding: '15px', textAlign: 'center' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -2034,17 +2094,14 @@ function TelaUsuarioAtracao({ usuario, mostrarMensagem }) {
                     borderBottom: '1px solid #ecf0f1',
                     background: index % 2 === 0 ? 'white' : '#f8f9fa'
                   }}>
-                    <td style={{ padding: '15px', fontWeight: 'bold' }}>#{pedido.numero_pedido}</td>
+                    <td style={{ padding: '15px', fontWeight: 'bold' }}>#{String(pedido.numero_pedido)}</td>
                     <td style={{ padding: '15px' }}>
-                      {new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}
+                      {pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : 'N/A'}
                     </td>
                     <td style={{ padding: '15px' }}>{pedido.cliente_nome}</td>
                     <td style={{ padding: '15px', textAlign: 'center' }}>{pedido.total_itens}</td>
                     <td style={{ padding: '15px', textAlign: 'center' }}>{pedido.total_produtos}</td>
                     <td style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-  {pedido.origem === 'yampi' ? '🛒 Yampi' : '🎟️ PDV'}
-</td>
                       R$ {parseFloat(pedido.valor_total_itens || 0).toFixed(2)}
                     </td>
                     <td style={{ padding: '15px' }}>
@@ -2058,6 +2115,62 @@ function TelaUsuarioAtracao({ usuario, mostrarMensagem }) {
                       }}>
                         {pedido.status_financeiro}
                       </span>
+                    </td>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: pedido.itens_confirmados === pedido.total_itens ? '#27ae60' : '#e67e22' }}>
+                          {pedido.itens_confirmados || 0} / {pedido.total_itens}
+                        </span>
+                        <div style={{ width: '80px', height: '6px', background: '#ecf0f1', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${(pedido.itens_confirmados || 0) / pedido.total_itens * 100}%`,
+                            height: '100%',
+                            background: pedido.itens_confirmados === pedido.total_itens ? '#27ae60' : '#e67e22',
+                            transition: 'width 0.3s'
+                          }} />
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>
+                      {pedido.origem === 'yampi' ? '🛒 Yampi' : '🎟️ PDV'}
+                    </td>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        {pedido.itens_confirmados < pedido.total_itens && (
+                          <button
+                            onClick={() => confirmarTodosItens(pedido.id, pedido.origem)}
+                            style={{
+                              padding: '8px 16px',
+                              background: 'linear-gradient(135deg, #27ae60 0%, #229954 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            ✅ Confirmar Todos
+                          </button>
+                        )}
+                        {pedido.itens_confirmados > 0 && (
+                          <button
+                            onClick={() => desconfirmarTodosItens(pedido.id, pedido.origem)}
+                            style={{
+                              padding: '8px 16px',
+                              background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            ❌ Desconfirmar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

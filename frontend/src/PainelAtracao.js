@@ -193,7 +193,7 @@ function PedidosAtracao({ mostrarMensagem }) {
     return (
       <div className="tela-pedido-detalhes">
         <div className="tela-header">
-          <h2>📦 Pedido #{pedidoSelecionado.pedido.numero_pedido}</h2>
+          <h2>📦 Pedido #{String(pedidoSelecionado.pedido.numero_pedido)}</h2>
           <button onClick={() => setPedidoSelecionado(null)} className="btn-secondary">
             ← Voltar
           </button>
@@ -212,7 +212,7 @@ function PedidosAtracao({ mostrarMensagem }) {
 
           <div className="info-card">
             <h3>💰 Informações do Pedido</h3>
-            <p><strong>Número:</strong> #{pedidoSelecionado.pedido.numero_pedido}</p>
+            <p><strong>Número:</strong> #{String(pedidoSelecionado.pedido.numero_pedido)}</p>
             <p><strong>Status:</strong> <span className="badge">{pedidoSelecionado.pedido.status_pedido}</span></p>
             <p><strong>Status Financeiro:</strong> <span className="badge">{pedidoSelecionado.pedido.status_financeiro}</span></p>
             <p><strong>Valor Total:</strong> R$ {pedidoSelecionado.pedido.valor_total.toFixed(2)}</p>
@@ -311,7 +311,7 @@ function PedidosAtracao({ mostrarMensagem }) {
             return (
               <div key={pedido.pedido_id} className="pedido-card">
                 <div className="pedido-header-info">
-                  <h3>Pedido #{pedido.numero_pedido}</h3>
+                  <h3>Pedido #{String(pedido.numero_pedido)}</h3>
                   <span className={`status-badge ${pedido.status_financeiro}`}>
                     {pedido.status_financeiro}
                   </span>
@@ -319,7 +319,7 @@ function PedidosAtracao({ mostrarMensagem }) {
 
                 <div className="pedido-dados">
                   <p><strong>👤 Cliente:</strong> {pedido.cliente_nome}</p>
-                  <p><strong>📅 Data:</strong> {new Date(pedido.data_pedido).toLocaleDateString('pt-BR')}</p>
+                  <p><strong>📅 Data:</strong> {pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : 'N/A'}</p>
                   <p><strong>💰 Valor:</strong> R$ {pedido.valor_total.toFixed(2)}</p>
                 </div>
 
@@ -480,8 +480,8 @@ function RelatorioFinanceiro({ mostrarMensagem }) {
 
                   return (
                     <tr key={item.id}>
-                      <td>{new Date(item.data_pedido).toLocaleDateString('pt-BR')}</td>
-                      <td>#{item.numero_pedido}</td>
+                      <td>{item.data_pedido ? new Date(item.data_pedido).toLocaleDateString('pt-BR') : 'N/A'}</td>
+                      <td>#{String(item.numero_pedido)}</td>
                       <td>{item.cliente_nome}</td>
                       <td>{item.produto_interno_nome || item.produto_yampi_nome}</td>
                       <td>{item.quantidade}</td>

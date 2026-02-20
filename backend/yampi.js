@@ -34,6 +34,48 @@ function getYampiClient() {
   });
 }
 
+// ============= CLASSIFICAÇÃO AUTOMÁTICA =============
+
+function classificarItemAutomaticamente(produtoNome) {
+  if (!produtoNome) return null;
+  
+  const nomeNormalizado = produtoNome.toLowerCase();
+  
+  // Buscar produtos do sistema
+  const produtos = db.prepare('SELECT id, nome, atracao_id FROM produtos WHERE ativo = 1').all();
+  
+  // Tentar encontrar produto correspondente
+  const produtoEncontrado = produtos.find(p => {
+    const nomeProduto = p.nome.toLowerCase();
+    
+    // Verificar Dreamhouse
+    if (nomeNormalizado.includes('dream') && nomeProduto.includes('dream')) {
+      return true;
+    }
+    
+    // Verificar Animais Incríveis
+    if (nomeNormalizado.includes('animais') && nomeProduto.includes('animais')) {
+      // Se tem "infantil" no nome, deve ser o produto infantil
+      if (nomeNormalizado.includes('infantil') || nomeNormalizado.includes('criança')) {
+        return nomeProduto.includes('infantil');
+      }
+      // Se não tem "infantil", deve ser o adulto
+      return !nomeProduto.includes('infantil');
+    }
+    
+    return false;
+  });
+  
+  if (produtoEncontrado) {
+    return {
+      produto_id: produtoEncontrado.id,
+      atracao_id: produtoEncontrado.atracao_id
+    };
+  }
+  
+  return null;
+}
+
 // ============= DETECÇÃO AUTOMÁTICA DE COLUNAS =============
 
 function getColunasDisponiveis() {
@@ -248,51 +290,61 @@ async function sincronizarPedidos(options = {}) {
   try {
     console.log('🔄 Iniciando sincronização de pedidos Yampi...');
 
-    const params = {
-      page: options.page || 1,
-      limit: options.limit || 50,
-      ...options.filters
-    };
-
-    if (options.statusIds && Array.isArray(options.statusIds)) {
-      options.statusIds.forEach((id, index) => {
-        params[`status_id[${index}]`] = id;
-      });
-    }
-
-    if (options.dateFrom && options.dateTo) {
-      params.date = `created_at:${options.dateFrom}|${options.dateTo}`;
-    } else if (options.dateFrom) {
-      params.date = `created_at:${options.dateFrom}`;
-    }
-
-    const resultado = await buscarPedidos(params);
-    const pedidos = resultado.data || [];
-
     let novos = 0;
     let atualizados = 0;
     let erros = 0;
+    let paginaAtual = 1;
+    let totalPaginas = 1;
 
-    for (const pedido of pedidos) {
-      try {
-        const existe = db.prepare('SELECT id FROM pedidos_yampi WHERE yampi_order_id = ?')
-          .get(pedido.id);
+    // Loop para buscar TODAS as páginas
+    do {
+      const params = {
+        page: paginaAtual,
+        limit: 100, // Máximo por página
+        ...options.filters
+      };
 
-        await salvarPedido(pedido);
-
-        if (existe) {
-          atualizados++;
-        } else {
-          novos++;
-        }
-      } catch (error) {
-        console.error(`Erro ao salvar pedido ${pedido.number}:`, error.message);
-        erros++;
+      if (options.statusIds && Array.isArray(options.statusIds)) {
+        options.statusIds.forEach((id, index) => {
+          params[`status_id[${index}]`] = id;
+        });
       }
-    }
+
+      if (options.dateFrom && options.dateTo) {
+        params.date = `created_at:${options.dateFrom}|${options.dateTo}`;
+      } else if (options.dateFrom) {
+        params.date = `created_at:${options.dateFrom}`;
+      }
+
+      console.log(`📖 Buscando página ${paginaAtual}...`);
+      const resultado = await buscarPedidos(params);
+      const pedidos = resultado.data || [];
+
+      totalPaginas = resultado.meta?.pagination?.total_pages || 1;
+
+      for (const pedido of pedidos) {
+        try {
+          const existe = db.prepare('SELECT id FROM pedidos_yampi WHERE yampi_order_id = ?')
+            .get(pedido.id);
+
+          await salvarPedido(pedido);
+
+          if (existe) {
+            atualizados++;
+          } else {
+            novos++;
+          }
+        } catch (error) {
+          console.error(`Erro ao salvar pedido ${pedido.number}:`, error.message);
+          erros++;
+        }
+      }
+
+      paginaAtual++;
+    } while (paginaAtual <= totalPaginas);
 
     const total = novos + atualizados;
-    console.log(`✅ Sincronização concluída: ${novos} novos, ${atualizados} atualizados, ${erros} erros`);
+    console.log(`✅ Sincronização concluída: ${total} pedidos (${novos} novos, ${atualizados} atualizados, ${erros} erros) de ${totalPaginas} páginas`);
 
     return {
       sucesso: true,
@@ -300,8 +352,8 @@ async function sincronizarPedidos(options = {}) {
       novos,
       atualizados,
       erros,
-      totalPaginas: resultado.meta?.pagination?.total_pages || 1,
-      paginaAtual: resultado.meta?.pagination?.current_page || 1
+      totalPaginas,
+      paginaAtual: totalPaginas
     };
 
   } catch (error) {
@@ -319,7 +371,7 @@ async function salvarPedido(pedido) {
 
   const dadosPedido = {
     yampi_order_id: pedido.id,
-    numero_pedido: pedido.number,
+    numero_pedido: String(pedido.number),
     cliente_nome: pedido.customer?.data?.name || '',
     cliente_email: pedido.customer?.data?.email || '',
     cliente_cpf: pedido.customer?.data?.cpf || '',
@@ -333,8 +385,8 @@ async function salvarPedido(pedido) {
     valor_produtos: parseFloat(pedido.value_products || 0),
     valor_desconto: parseFloat(pedido.value_discount || 0),
     valor_frete: parseFloat(pedido.value_shipment || 0),
-    data_pedido: pedido.created_at || new Date().toISOString(),
-    data_atualizacao: pedido.updated_at || new Date().toISOString(),
+    data_pedido: (typeof pedido.created_at === 'object' && pedido.created_at?.date) ? pedido.created_at.date : (pedido.created_at || new Date().toISOString()),
+    data_atualizacao: (typeof pedido.updated_at === 'object' && pedido.updated_at?.date) ? pedido.updated_at.date : (pedido.updated_at || new Date().toISOString()),
     endereco_rua: pedido.shipping_address?.data?.street || '',
     endereco_numero: pedido.shipping_address?.data?.number || '',
     endereco_complemento: pedido.shipping_address?.data?.complement || '',
@@ -371,18 +423,23 @@ async function salvarPedido(pedido) {
 async function salvarItemPedido(pedidoId, item) {
   const colunasDisponiveis = getColunasItensDisponiveis();
   
+  const produtoNome = item.sku?.data?.title || item.name || '';
+  
+  // Tentar classificar automaticamente
+  const produtoClassificado = classificarItemAutomaticamente(produtoNome);
+  
   const dadosItem = {
     pedido_yampi_id: pedidoId,
     yampi_item_id: item.id,
-    produto_yampi_nome: item.name || '',
-    sku: item.sku_code || '',
+    produto_yampi_nome: produtoNome,
+    sku: item.sku?.data?.sku || item.item_sku || item.sku_code || '',
     quantidade: parseInt(item.quantity || 1),
     preco_unitario: parseFloat(item.price || 0),
     valor_total: parseFloat(item.price_total || (item.price * item.quantity) || 0),
-    produto_id: null,
-    atracao_id: null,
-    classificado: 0,
-    data_classificacao: null,
+    produto_id: produtoClassificado?.produto_id || null,
+    atracao_id: produtoClassificado?.atracao_id || null,
+    classificado: produtoClassificado ? 1 : 0,
+    data_classificacao: produtoClassificado ? new Date().toISOString() : null,
     presenca_confirmada: 0,
     data_confirmacao_presenca: null,
     confirmado_por: null

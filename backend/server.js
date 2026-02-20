@@ -134,11 +134,12 @@ app.get('/api/minha-atracao/pedidos', authenticateToken, requireAtracao, (req, r
       SELECT DISTINCT
         p.id,
         p.numero_pedido,
-        p.data_pedido as data,
+        p.data_pedido,
         p.cliente_nome,
         p.valor_total,
         p.status_financeiro,
         COUNT(DISTINCT i.id) as total_itens,
+        SUM(CASE WHEN i.presenca_confirmada = 1 THEN 1 ELSE 0 END) as itens_confirmados,
         SUM(i.quantidade) as total_produtos,
         SUM(i.valor_total) as valor_total_itens,
         'yampi' as origem
@@ -153,11 +154,12 @@ app.get('/api/minha-atracao/pedidos', authenticateToken, requireAtracao, (req, r
       SELECT 
         v.id,
         v.codigo_venda as numero_pedido,
-        v.created_at as data,
+        v.created_at as data_pedido,
         v.nome_cliente as cliente_nome,
         v.valor_total,
         'pago' as status_financeiro,
         1 as total_itens,
+        v.presenca_confirmada as itens_confirmados,
         v.quantidade_pessoas as total_produtos,
         v.valor_total as valor_total_itens,
         'pdv' as origem
@@ -168,7 +170,7 @@ app.get('/api/minha-atracao/pedidos', authenticateToken, requireAtracao, (req, r
 
     // ========== UNIFICAR E ORDENAR ==========
     const todosPedidos = [...pedidosYampi, ...vendasPDV];
-    todosPedidos.sort((a, b) => new Date(b.data) - new Date(a.data));
+    todosPedidos.sort((a, b) => new Date(b.data_pedido) - new Date(a.data_pedido));
 
     // ========== PAGINAÇÃO ==========
     const totalPedidos = todosPedidos.length;
@@ -335,6 +337,89 @@ app.get('/api/minha-atracao/relatorio', authenticateToken, requireAtracao, (req,
   }
 });
 
+// Listar pedidos da atração (Yampi + PDV)
+app.get('/api/atracao/pedidos', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const atracaoId = req.user.atracao_id;
+    const { status } = req.query;
+
+    if (!atracaoId) {
+      return res.status(400).json({ error: 'Usuário não vinculado a nenhuma atração' });
+    }
+
+    // ========== PEDIDOS YAMPI ==========
+    let queryYampi = `
+      SELECT DISTINCT
+        p.id as pedido_id,
+        p.numero_pedido,
+        p.data_pedido,
+        p.cliente_nome,
+        p.cliente_email,
+        p.cliente_telefone,
+        p.valor_total,
+        p.status_financeiro,
+        p.status_pedido,
+        COUNT(DISTINCT i.id) as total_itens,
+        SUM(CASE WHEN i.presenca_confirmada = 1 THEN 1 ELSE 0 END) as itens_confirmados,
+        SUM(i.quantidade) as total_produtos,
+        SUM(i.valor_total) as valor_total_itens,
+        'yampi' as origem
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON i.pedido_yampi_id = p.id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `;
+
+    const paramsYampi = [atracaoId];
+
+    if (status && status !== 'todos') {
+      queryYampi += ` AND p.status_financeiro = ?`;
+      paramsYampi.push(status);
+    }
+
+    queryYampi += ` GROUP BY p.id`;
+
+    const pedidosYampi = db.prepare(queryYampi).all(...paramsYampi);
+
+    // ========== VENDAS PDV ==========
+    const vendasPDV = db.prepare(`
+      SELECT 
+        v.id as pedido_id,
+        v.codigo_venda as numero_pedido,
+        v.created_at as data_pedido,
+        v.nome_cliente as cliente_nome,
+        '' as cliente_email,
+        v.telefone_cliente as cliente_telefone,
+        v.valor_total,
+        'pago' as status_financeiro,
+        'pago' as status_pedido,
+        1 as total_itens,
+        0 as itens_confirmados,
+        v.quantidade_pessoas as total_produtos,
+        v.valor_total as valor_total_itens,
+        'pdv' as origem
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).all(atracaoId);
+
+    // ========== UNIFICAR E ORDENAR ==========
+    const todosPedidos = [...pedidosYampi, ...vendasPDV];
+    todosPedidos.sort((a, b) => new Date(b.data_pedido) - new Date(a.data_pedido));
+
+    res.json({
+      pedidos: todosPedidos,
+      resumo: {
+        totalYampi: pedidosYampi.length,
+        totalPDV: vendasPDV.length,
+        total: todosPedidos.length
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao listar pedidos:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Detalhes de um pedido específico da atração
 app.get('/api/atracao/pedidos/:id', authenticateToken, requireAtracao, (req, res) => {
   try {
@@ -398,6 +483,130 @@ app.post('/api/atracao/confirmar-presenca/:itemId', authenticateToken, requireAt
     `).run(operador_id, itemId);
 
     res.json({ message: 'Presença confirmada com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Confirmar TODOS os itens de um pedido
+app.post('/api/minha-atracao/confirmar-todos/:pedidoId', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { pedidoId } = req.params;
+    const { origem } = req.body;
+    const { atracao_id, id: operador_id } = req.user;
+
+    if (origem === 'yampi') {
+      // Buscar todos os itens do pedido
+      const itens = db.prepare(`
+        SELECT id FROM itens_pedido_yampi 
+        WHERE pedido_yampi_id = ? AND atracao_id = ? AND classificado = 1
+      `).all(pedidoId, atracao_id);
+
+      if (itens.length === 0) {
+        return res.status(404).json({ error: 'Nenhum item encontrado para este pedido' });
+      }
+
+      // Confirmar todos os itens
+      const stmt = db.prepare(`
+        UPDATE itens_pedido_yampi SET
+          presenca_confirmada = 1,
+          data_confirmacao_presenca = CURRENT_TIMESTAMP,
+          confirmado_por = ?
+        WHERE id = ?
+      `);
+
+      for (const item of itens) {
+        stmt.run(operador_id, item.id);
+      }
+
+      res.json({ message: `${itens.length} itens confirmados com sucesso!` });
+    } else if (origem === 'pdv') {
+      // PDV - confirmar a venda inteira
+      const venda = db.prepare(`
+        SELECT v.id FROM vendas v
+        LEFT JOIN produtos p ON v.produto_id = p.id
+        WHERE v.id = ? AND p.atracao_id = ?
+      `).get(pedidoId, atracao_id);
+
+      if (!venda) {
+        return res.status(404).json({ error: 'Venda não encontrada' });
+      }
+
+      // Confirmar venda
+      db.prepare(`
+        UPDATE vendas SET
+          presenca_confirmada = 1,
+          data_confirmacao_presenca = CURRENT_TIMESTAMP,
+          confirmado_por = ?
+        WHERE id = ?
+      `).run(operador_id, pedidoId);
+
+      res.json({ message: 'Presença confirmada com sucesso!' });
+    } else {
+      res.status(400).json({ error: 'Origem inválida' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Desconfirmar TODOS os itens de um pedido
+app.post('/api/minha-atracao/desconfirmar-todos/:pedidoId', authenticateToken, requireAtracao, (req, res) => {
+  try {
+    const { pedidoId } = req.params;
+    const { origem } = req.body;
+    const { atracao_id } = req.user;
+
+    if (origem === 'yampi') {
+      // Buscar todos os itens do pedido
+      const itens = db.prepare(`
+        SELECT id FROM itens_pedido_yampi 
+        WHERE pedido_yampi_id = ? AND atracao_id = ?
+      `).all(pedidoId, atracao_id);
+
+      if (itens.length === 0) {
+        return res.status(404).json({ error: 'Nenhum item encontrado para este pedido' });
+      }
+
+      // Desconfirmar todos os itens
+      const stmt = db.prepare(`
+        UPDATE itens_pedido_yampi SET
+          presenca_confirmada = 0,
+          data_confirmacao_presenca = NULL,
+          confirmado_por = NULL
+        WHERE id = ?
+      `);
+
+      for (const item of itens) {
+        stmt.run(item.id);
+      }
+
+      res.json({ message: `Confirmações canceladas para ${itens.length} itens` });
+    } else if (origem === 'pdv') {
+      // PDV - desconfirmar a venda inteira
+      const venda = db.prepare(`
+        SELECT v.id FROM vendas v
+        LEFT JOIN produtos p ON v.produto_id = p.id
+        WHERE v.id = ? AND p.atracao_id = ?
+      `).get(pedidoId, atracao_id);
+
+      if (!venda) {
+        return res.status(404).json({ error: 'Venda não encontrada' });
+      }
+
+      // Desconfirmar venda
+      db.prepare(`
+        UPDATE vendas SET
+          presenca_confirmada = 0,
+          data_confirmacao_presenca = NULL,
+          confirmado_por = NULL
+        WHERE id = ?
+      `).run(pedidoId);
+
+      res.json({ message: 'Confirmação cancelada' });
+    } else {
+      res.status(400).json({ error: 'Origem inválida' });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -530,52 +739,83 @@ app.get('/api/atracao/dashboard', authenticateToken, requireAtracao, (req, res) 
 
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Estatísticas gerais
+    // ========== PEDIDOS YAMPI ==========
+    const pedidosYampi = db.prepare(`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `).get(atracao_id).count;
+
+    const pedidosYampiHoje = db.prepare(`
+      SELECT COUNT(DISTINCT p.id) as count
+      FROM pedidos_yampi p
+      INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
+      WHERE i.atracao_id = ? AND i.classificado = 1
+      AND DATE(p.data_pedido) = DATE(?)
+    `).get(atracao_id, hoje).count;
+
+    const pessoasYampi = db.prepare(`
+      SELECT SUM(i.quantidade) as total
+      FROM itens_pedido_yampi i
+      WHERE i.atracao_id = ? AND i.classificado = 1
+    `).get(atracao_id).total || 0;
+
+    const pessoasYampiConfirmadas = db.prepare(`
+      SELECT SUM(i.quantidade) as total
+      FROM itens_pedido_yampi i
+      WHERE i.atracao_id = ? 
+      AND i.presenca_confirmada = 1
+    `).get(atracao_id).total || 0;
+
+    const presencasYampiHoje = db.prepare(`
+      SELECT SUM(i.quantidade) as total
+      FROM itens_pedido_yampi i
+      INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
+      WHERE i.atracao_id = ? 
+      AND i.presenca_confirmada = 1
+      AND DATE(i.data_confirmacao_presenca) = DATE(?)
+    `).get(atracao_id, hoje).total || 0;
+
+    const pendenteYampi = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM itens_pedido_yampi i
+      WHERE i.atracao_id = ? 
+      AND i.classificado = 1
+      AND i.presenca_confirmada = 0
+    `).get(atracao_id).count;
+
+    // ========== VENDAS PDV ==========
+    const vendasPDV = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).get(atracao_id).count;
+
+    const vendasPDVHoje = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+      AND DATE(v.created_at) = DATE(?)
+    `).get(atracao_id, hoje).count;
+
+    const pessoasPDV = db.prepare(`
+      SELECT SUM(v.quantidade_pessoas) as total
+      FROM vendas v
+      LEFT JOIN produtos p ON v.produto_id = p.id
+      WHERE p.atracao_id = ?
+    `).get(atracao_id).total || 0;
+
+    // ========== UNIFICAR ESTATÍSTICAS ==========
     const stats = {
-      total_pedidos: db.prepare(`
-        SELECT COUNT(DISTINCT p.id) as count
-        FROM pedidos_yampi p
-        INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
-        WHERE i.atracao_id = ? AND i.classificado = 1
-      `).get(atracao_id).count,
-
-      pedidos_hoje: db.prepare(`
-        SELECT COUNT(DISTINCT p.id) as count
-        FROM pedidos_yampi p
-        INNER JOIN itens_pedido_yampi i ON p.id = i.pedido_yampi_id
-        WHERE i.atracao_id = ? AND i.classificado = 1
-        AND DATE(p.data_pedido) = DATE(?)
-      `).get(atracao_id, hoje).count,
-
-      presencas_hoje: db.prepare(`
-        SELECT SUM(i.quantidade) as total
-        FROM itens_pedido_yampi i
-        INNER JOIN pedidos_yampi p ON i.pedido_yampi_id = p.id
-        WHERE i.atracao_id = ? 
-        AND i.presenca_confirmada = 1
-        AND DATE(i.data_confirmacao_presenca) = DATE(?)
-      `).get(atracao_id, hoje).total || 0,
-
-      pendentes_confirmacao: db.prepare(`
-        SELECT COUNT(*) as count
-        FROM itens_pedido_yampi i
-        WHERE i.atracao_id = ? 
-        AND i.classificado = 1
-        AND i.presenca_confirmada = 0
-      `).get(atracao_id).count,
-
-      total_pessoas: db.prepare(`
-        SELECT SUM(i.quantidade) as total
-        FROM itens_pedido_yampi i
-        WHERE i.atracao_id = ? AND i.classificado = 1
-      `).get(atracao_id).total || 0,
-
-      pessoas_confirmadas: db.prepare(`
-        SELECT SUM(i.quantidade) as total
-        FROM itens_pedido_yampi i
-        WHERE i.atracao_id = ? 
-        AND i.presenca_confirmada = 1
-      `).get(atracao_id).total || 0
+      total_pedidos: pedidosYampi + vendasPDV,
+      pedidos_hoje: pedidosYampiHoje + vendasPDVHoje,
+      presencas_hoje: presencasYampiHoje,
+      pendentes_confirmacao: pendenteYampi,
+      total_pessoas: pessoasYampi + pessoasPDV,
+      pessoas_confirmadas: pessoasYampiConfirmadas
     };
 
     res.json(stats);
@@ -864,11 +1104,25 @@ app.put('/api/yampi/itens/:id/classificar', authenticateToken, requireAdmin, (re
   try {
     const { id } = req.params;
     const { produto_id, atracao_id } = req.body;
+    
+    console.log('📋 Classificando item:', { id, produto_id, atracao_id });
 
     if (!produto_id || !atracao_id) {
       return res.status(400).json({ error: 'produto_id e atracao_id são obrigatórios' });
     }
 
+    // Buscar o nome do produto deste item
+    const item = db.prepare(`
+      SELECT produto_yampi_nome
+      FROM itens_pedido_yampi 
+      WHERE id = ?
+    `).get(id);
+
+    if (!item) {
+      return res.status(404).json({ error: 'Item não encontrado' });
+    }
+
+    // Classificar o item selecionado
     db.prepare(`
       UPDATE itens_pedido_yampi SET
         produto_id = ?,
@@ -878,8 +1132,36 @@ app.put('/api/yampi/itens/:id/classificar', authenticateToken, requireAdmin, (re
       WHERE id = ?
     `).run(produto_id, atracao_id, id);
 
-    res.json({ message: 'Item classificado com sucesso' });
+    // CLASSIFICAÇÃO EM CASCATA: Classificar automaticamente todos os outros itens
+    // com o mesmo nome de produto que ainda não foram classificados
+    let classificadosAutomaticamente = 0;
+    
+    if (item.produto_yampi_nome) {
+      const result = db.prepare(`
+        UPDATE itens_pedido_yampi SET
+          produto_id = ?,
+          atracao_id = ?,
+          classificado = 1,
+          data_classificacao = CURRENT_TIMESTAMP
+        WHERE produto_yampi_nome = ? 
+          AND classificado = 0
+          AND id != ?
+      `).run(produto_id, atracao_id, item.produto_yampi_nome, id);
+      
+      classificadosAutomaticamente = result.changes;
+    }
+
+    console.log(`✅ Item classificado! ${classificadosAutomaticamente} itens adicionais classificados automaticamente`);
+    
+    res.json({ 
+      message: 'Item classificado com sucesso',
+      classificadosAutomaticamente,
+      mensagemCompleta: classificadosAutomaticamente > 0 
+        ? `Item classificado! ${classificadosAutomaticamente} outros itens com o mesmo produto foram classificados automaticamente.`
+        : 'Item classificado com sucesso!'
+    });
   } catch (error) {
+    console.error('❌ Erro ao classificar item:', error);
     res.status(500).json({ error: error.message });
   }
 });
