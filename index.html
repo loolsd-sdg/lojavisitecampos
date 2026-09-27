@@ -1,0 +1,1593 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Cérebro da Marca: a IA revisa o vídeo do influenciador antes da marca, para ele chegar certo de primeira. Protótipo navegável.">
+<title>Cérebro da Marca</title>
+<style>
+[hidden]{display:none!important}
+/* ============ Tokens (base: Apple Human Interface Guidelines) ============ */
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-d:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --bg:#F2F2F7;--surface:#FFFFFF;--surface-2:#F9F9FB;--fill:rgba(118,118,128,.12);--fill-2:rgba(118,118,128,.07);
+  --label:#1D1D1F;--label-2:#6E6E73;--label-3:#8E8E93;--sep:#D2D2D7;--sep-2:#E5E5EA;
+  --accent:#0071E3;--accent-h:#0077ED;--accent-soft:#E8F1FD;--accent-text:#0066CC;
+  --green:#248A3D;--green-fill:#34C759;--green-soft:#E4F6E9;
+  --orange:#B45309;--orange-fill:#FF9500;--orange-soft:#FFF2DF;
+  --red:#D70015;--red-fill:#FF3B30;--red-soft:#FFE7E5;
+  --indigo:#3634A3;--indigo-fill:#5856D6;--indigo-soft:#EDECFC;
+  --glass:rgba(255,255,255,.76);--glass-dark:rgba(29,29,31,.86);
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 18px rgba(0,0,0,.05);
+  --shadow-lg:0 24px 70px rgba(0,0,0,.18);
+  --r:14px;--r-sm:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#000000;--surface:#1C1C1E;--surface-2:#2C2C2E;--fill:rgba(118,118,128,.24);--fill-2:rgba(118,118,128,.16);
+    --label:#F5F5F7;--label-2:#AEAEB2;--label-3:#8E8E93;--sep:#38383A;--sep-2:#2C2C2E;
+    --accent:#0A84FF;--accent-h:#409CFF;--accent-soft:#0A2A4D;--accent-text:#4DA3FF;
+    --green:#30D158;--green-fill:#30D158;--green-soft:#0F2E18;
+    --orange:#FF9F0A;--orange-fill:#FF9F0A;--orange-soft:#33230A;
+    --red:#FF453A;--red-fill:#FF453A;--red-soft:#3A1412;
+    --indigo:#9A99FF;--indigo-fill:#5E5CE6;--indigo-soft:#1E1D40;
+    --glass:rgba(28,28,30,.78);--shadow:0 1px 2px rgba(0,0,0,.4),0 4px 18px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html,body{margin:0;background:var(--bg);color:var(--label);font-family:var(--font);font-size:15px;line-height:1.47;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--font-d);margin:0;line-height:1.15;letter-spacing:-.02em;text-wrap:balance}
+h1{font-size:2.1rem;font-weight:700}
+h2{font-size:1.45rem;font-weight:700}
+h3{font-size:1.07rem;font-weight:600;letter-spacing:-.01em}
+p{margin:0}
+ul,ol{margin:0;padding-left:1.15em}
+a{color:var(--accent-text)}
+button{font:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:2px;border-radius:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--label-2)}
+.faint{color:var(--label-3)}
+.small{font-size:.86rem}
+.xs{font-size:.78rem}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.stack{display:flex;flex-direction:column;gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.ic{width:20px;height:20px;flex-shrink:0;display:inline-block;vertical-align:middle}
+.ic.sm{width:16px;height:16px}.ic.lg{width:28px;height:28px}.ic.xl{width:40px;height:40px}
+
+/* ============ Botões ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:7px 16px;border-radius:999px;border:0;font-weight:600;font-size:.94rem;background:var(--fill);color:var(--label);transition:background .15s,transform .05s;text-decoration:none;white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn:hover{background:color-mix(in srgb,var(--fill) 70%,var(--label) 8%)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-h)}
+.btn.tinted{background:var(--accent-soft);color:var(--accent-text)}
+.btn.good{background:var(--green-fill);color:#fff}
+.btn.good:hover{background:color-mix(in srgb,var(--green-fill) 88%,#000)}
+.btn.warn{background:var(--orange-soft);color:var(--orange)}
+.btn.danger{background:var(--red-soft);color:var(--red)}
+.btn.plain{background:transparent;color:var(--accent-text);padding-inline:8px}
+.btn.plain:hover{background:var(--accent-soft)}
+.btn.lg{min-height:48px;padding:12px 24px;font-size:1.02rem}
+.btn.sm{min-height:30px;padding:5px 12px;font-size:.84rem}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none}
+.iconbtn{width:36px;height:36px;border-radius:50%;border:0;background:var(--fill);display:inline-grid;place-items:center;color:var(--label-2)}
+.iconbtn:hover{color:var(--label)}
+.link{border:0;background:none;padding:0;color:var(--accent-text);font-weight:600;cursor:pointer}
+.link:hover{text-decoration:underline}
+
+/* ============ Superfícies ============ */
+.card{background:var(--surface);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.card.flat{box-shadow:none;background:var(--surface-2);border:1px solid var(--sep-2)}
+.card.tint{background:var(--accent-soft);box-shadow:none}
+.card.hl{outline:2px solid var(--accent);outline-offset:-2px}
+.card h3 .ic{color:var(--accent)}
+.sechead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:.78rem;font-weight:600;letter-spacing:.02em;color:var(--label-2);text-transform:none}
+.kicker{font-size:.8rem;font-weight:600;color:var(--accent-text)}
+
+/* grouped list (iOS) */
+.group{background:var(--surface);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+.group .gi{display:flex;align-items:center;gap:12px;padding:12px 16px;position:relative;min-height:48px}
+.group .gi + .gi::before{content:"";position:absolute;top:0;left:52px;right:0;border-top:1px solid var(--sep-2)}
+.group .gi.noicon + .gi::before,.group .gi.noicon::before{left:16px}
+.group .gi .gic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;flex-shrink:0}
+.group .gi .gt{flex:1;min-width:0}
+.group .gi .gt b{display:block;font-weight:600}
+.group button.gi{width:100%;border:0;background:none;text-align:left}
+.group button.gi:hover{background:var(--fill-2)}
+.gh{font-size:.8rem;font-weight:600;color:var(--label-2);margin:18px 16px 6px;text-transform:uppercase;letter-spacing:.03em}
+
+/* chips / status */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--fill);color:var(--label-2);white-space:nowrap}
+.chip .ic{width:13px;height:13px}
+.chip.good{background:var(--green-soft);color:var(--green)}
+.chip.warn{background:var(--orange-soft);color:var(--orange)}
+.chip.bad{background:var(--red-soft);color:var(--red)}
+.chip.acc{background:var(--accent-soft);color:var(--accent-text)}
+.chip.ind{background:var(--indigo-soft);color:var(--indigo)}
+.badge{background:var(--red-fill);color:#fff;border-radius:999px;font-size:.72rem;font-weight:700;min-width:20px;height:20px;padding:0 6px;display:inline-grid;place-items:center}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:6px}
+.field > span{font-size:.86rem;font-weight:600}
+.field .hint{font-size:.8rem;color:var(--label-2);font-weight:400}
+.inp{width:100%;border:1px solid transparent;background:var(--fill);border-radius:10px;padding:10px 12px;min-height:42px;outline:none}
+.inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent)}
+textarea.inp{min-height:84px;resize:vertical}
+.err{color:var(--red);font-size:.84rem;display:flex;gap:6px;align-items:center}
+.seg{display:inline-flex;background:var(--fill);border-radius:10px;padding:2px;gap:2px}
+.seg button{border:0;background:none;border-radius:8px;padding:6px 14px;font-weight:600;font-size:.88rem;color:var(--label);min-height:32px}
+.seg button.on{background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+.seg.full{display:flex}.seg.full button{flex:1}
+.switch{position:relative;width:51px;height:31px;display:inline-block;flex-shrink:0}
+.switch input{opacity:0;width:100%;height:100%;margin:0;position:absolute;inset:0;cursor:pointer;z-index:1}
+.switch span{position:absolute;inset:0;background:var(--fill);border-radius:999px;transition:background .2s}
+.switch span::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .2s}
+.switch input:checked + span{background:var(--green-fill)}
+.switch input:checked + span::after{transform:translateX(20px)}
+.switch input:focus-visible + span{outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:2px}
+input[type=range]{accent-color:var(--accent);width:100%}
+
+/* list chips (guia) */
+.items{display:flex;flex-wrap:wrap;gap:8px}
+.item{display:inline-flex;align-items:center;gap:6px;border-radius:9px;padding:6px 6px 6px 10px;font-size:.88rem;background:var(--fill-2)}
+.item .ic{width:15px;height:15px}
+.item button{border:0;background:none;color:var(--label-3);width:24px;height:24px;border-radius:6px;display:grid;place-items:center}
+.item button:hover{background:var(--fill);color:var(--label)}
+.item.yes .ic{color:var(--green)}.item.no .ic{color:var(--red)}.item.vis .ic{color:var(--accent-text)}.item.req .ic{color:var(--orange)}
+
+/* tip (TipKit) */
+.tip{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;background:var(--surface);border-radius:var(--r);padding:14px 14px 14px 16px;box-shadow:var(--shadow);border-left:4px solid var(--indigo-fill)}
+.tip .ic{color:var(--indigo-fill);width:24px;height:24px}
+.tip b{display:block;margin-bottom:2px}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:40px 20px}
+.empty .ic{width:44px;height:44px;color:var(--label-3)}
+
+/* KPIs */
+.kpi{background:var(--surface);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px}
+.kpi .top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--label-2);font-size:.84rem;font-weight:600}
+.kpi .v{font-family:var(--font-d);font-size:2rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .cmp{font-size:.8rem;color:var(--label-2);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.info{border:0;background:none;color:var(--label-3);width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;padding:0}
+.info:hover{color:var(--accent-text);background:var(--accent-soft)}
+.info .ic{width:17px;height:17px}
+
+/* barras */
+.hb{display:grid;grid-template-columns:minmax(140px,1.2fr) 1fr 34px;gap:10px;align-items:center;font-size:.88rem}
+.track{height:8px;background:var(--fill);border-radius:99px;position:relative;overflow:hidden}
+.track i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--accent)}
+.track i.good{background:var(--green-fill)}.track i.warn{background:var(--orange-fill)}.track i.bad{background:var(--red-fill)}.track i.ind{background:var(--indigo-fill)}
+.hb .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--label-2)}
+.progress{height:6px;background:var(--fill);border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .35s ease}
+
+/* tabela */
+.tw{overflow-x:auto;background:var(--surface);border-radius:var(--r);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:11px 14px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--sep-2)}
+th{font-size:.78rem;font-weight:600;color:var(--label-2);background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--fill-2)}
+td.d.up{color:var(--green);font-weight:600}td.d.dn{color:var(--red);font-weight:600}
+
+/* sheets / toast */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.36);display:grid;place-items:center;z-index:80;padding:20px;animation:fade .18s ease}
+.sheet{background:var(--surface);border-radius:18px;max-width:560px;width:100%;max-height:88vh;overflow:auto;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;animation:rise .22s ease}
+.sheet.wide{max-width:720px}
+.sheet .sh{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px 10px;position:sticky;top:0;background:var(--surface);z-index:1}
+.sheet .sb{padding:4px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.sheet .sf{display:flex;gap:10px;justify-content:flex-end;padding:12px 20px 18px;border-top:1px solid var(--sep-2);position:sticky;bottom:0;background:var(--surface)}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{transform:translateY(14px);opacity:0}}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;background:var(--glass-dark);color:#fff;border-radius:14px;padding:10px 10px 10px 16px;display:flex;gap:14px;align-items:center;box-shadow:var(--shadow-lg);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);max-width:calc(100vw - 32px);font-size:.92rem}
+#toast .ic{color:var(--green-fill)}
+#toast button{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:6px 12px;font-weight:600}
+#toast button:hover{background:rgba(255,255,255,.28)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============ Site (landing) ============ */
+.site{background:var(--surface);min-height:100vh}
+.snav{position:sticky;top:0;z-index:50;background:var(--glass);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--sep-2)}
+.snav .in{max-width:1120px;margin:0 auto;padding:10px 22px;display:flex;align-items:center;gap:22px}
+.logo{display:flex;align-items:center;gap:9px;font-family:var(--font-d);font-weight:700;font-size:1.02rem;letter-spacing:-.01em;border:0;background:none;padding:0;color:var(--label)}
+.logo .mk{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#0071E3,#5856D6);display:grid;place-items:center;color:#fff}
+.logo .mk .ic{width:17px;height:17px}
+.snav nav{display:flex;gap:18px;flex:1}
+.snav nav button{border:0;background:none;color:var(--label-2);font-size:.88rem;padding:4px 0}
+.snav nav button:hover{color:var(--label)}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:22px}
+.hero{padding-block:72px 56px;display:grid;grid-template-columns:1.08fr .92fr;gap:40px;align-items:center}
+.hero h1{font-size:clamp(2.4rem,5.2vw,3.7rem);font-weight:700;letter-spacing:-.035em;line-height:1.04}
+.hero .sub{font-size:1.22rem;color:var(--label-2);max-width:34ch;margin-top:18px;line-height:1.45}
+.hero .ctas{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.hero .micro{margin-top:14px;font-size:.86rem;color:var(--label-2);display:flex;gap:14px;flex-wrap:wrap}
+.hero .micro span{display:inline-flex;gap:5px;align-items:center}
+.hero .micro .ic{color:var(--green);width:16px;height:16px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--indigo-soft);color:var(--indigo);border-radius:999px;padding:5px 12px;font-size:.84rem;font-weight:600;margin-bottom:16px}
+.pill .ic{width:15px;height:15px}
+.mock{position:relative;justify-self:center;width:340px;max-width:100%;padding-bottom:34px}
+.mock .dev{background:var(--surface);border-radius:36px;padding:16px;box-shadow:var(--shadow-lg),0 0 0 10px #1D1D1F,0 0 0 11px #3A3A3C;display:flex;flex-direction:column;gap:12px}
+.mock .float{position:absolute;right:-30px;bottom:0;background:var(--surface);border-radius:14px;box-shadow:var(--shadow-lg);padding:10px 14px;display:flex;gap:10px;align-items:center;font-weight:600;font-size:.9rem}
+.mock .float .ic{color:var(--green-fill);width:26px;height:26px}
+.band{background:var(--bg);padding-block:64px}
+.band.alt{background:var(--surface)}
+.sect-h{text-align:center;max-width:720px;margin:0 auto 36px}
+.sect-h h2{font-size:clamp(1.8rem,3.4vw,2.6rem);letter-spacing:-.03em}
+.sect-h p{color:var(--label-2);font-size:1.1rem;margin-top:10px}
+.stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.stat{background:var(--surface);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow)}
+.stat b{font-family:var(--font-d);font-size:2.6rem;letter-spacing:-.03em;line-height:1}
+.feat{background:var(--surface);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.feat .fi{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff}
+.steps4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;counter-reset:s}
+.st4{background:var(--surface);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);position:relative}
+.st4 .n{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:.9rem}
+.st4.core{outline:2px solid var(--green-fill)}
+.st4 .who{font-size:.78rem;font-weight:600;color:var(--label-2)}
+.loopline{margin-top:16px;text-align:center;color:var(--label-2);display:flex;gap:8px;justify-content:center;align-items:center}
+.loopline .ic{color:var(--indigo-fill)}
+.two-aud{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.aud{border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:14px}
+.aud.b{background:linear-gradient(160deg,var(--accent-soft),var(--surface))}
+.aud.c{background:linear-gradient(160deg,var(--green-soft),var(--surface))}
+.aud ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:10px}
+.aud li{display:grid;grid-template-columns:22px 1fr;gap:10px}
+.aud li .ic{color:var(--green);width:20px;height:20px;margin-top:1px}
+.core-sec{display:grid;grid-template-columns:.9fr 1.1fr;gap:40px;align-items:center}
+.core-sec ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:16px}
+.core-sec li{display:grid;grid-template-columns:40px 1fr;gap:12px}
+.core-sec li .bx{width:40px;height:40px;border-radius:11px;display:grid;place-items:center}
+.prices{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.price{background:var(--surface);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);position:relative}
+.price.pop{outline:2px solid var(--accent)}
+.price .tag{position:absolute;top:-11px;left:22px;background:var(--accent);color:#fff;font-size:.74rem;font-weight:700;padding:3px 10px;border-radius:999px}
+.price .amt{font-family:var(--font-d);font-size:2rem;font-weight:700;letter-spacing:-.02em}
+.price .amt small{font-size:.9rem;color:var(--label-2);font-weight:500}
+.price ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:7px;font-size:.9rem;flex:1}
+.price li{display:grid;grid-template-columns:18px 1fr;gap:8px}
+.price li .ic{color:var(--green);width:17px;height:17px;margin-top:2px}
+.faq{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.faq details{background:var(--surface);border-radius:14px;padding:4px 18px;box-shadow:var(--shadow)}
+.faq summary{cursor:pointer;font-weight:600;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .ic{transition:transform .2s;color:var(--label-3)}
+.faq details[open] summary .ic{transform:rotate(90deg)}
+.faq details p{padding:0 0 16px;color:var(--label-2)}
+.cta-final{text-align:center;padding-block:72px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.sfoot{border-top:1px solid var(--sep-2);padding-block:22px;color:var(--label-2);font-size:.82rem}
+@media (max-width:900px){.hero,.core-sec,.two-aud{grid-template-columns:1fr}.steps4,.prices{grid-template-columns:1fr 1fr}.stats3{grid-template-columns:1fr}.snav nav{display:none}.mock .float{right:0}}
+@media (max-width:560px){.steps4,.prices{grid-template-columns:1fr}}
+
+/* ============ Login / onboarding ============ */
+.auth{min-height:100vh;display:grid;grid-template-columns:1fr 1fr}
+.auth .side{background:linear-gradient(160deg,#0071E3 0%,#5856D6 100%);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;gap:30px}
+.auth .side h2{font-size:2.1rem;letter-spacing:-.03em;max-width:15ch}
+.auth .side ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:14px;font-size:1.02rem}
+.auth .side li{display:grid;grid-template-columns:24px 1fr;gap:10px}
+.auth .side .logo{color:#fff}.auth .side .logo .mk{background:rgba(255,255,255,.2)}
+.auth .main{display:grid;place-items:center;padding:40px 22px;background:var(--bg)}
+.auth .form{width:100%;max-width:400px;display:flex;flex-direction:column;gap:16px}
+.auth .form .card{padding:26px}
+.demo-note{display:flex;gap:8px;align-items:flex-start;font-size:.84rem;color:var(--label-2);background:var(--fill-2);border-radius:10px;padding:10px 12px}
+.demo-note .ic{color:var(--accent-text);width:17px;height:17px;margin-top:1px}
+@media (max-width:820px){.auth{grid-template-columns:1fr}.auth .side{display:none}}
+.onb{min-height:100vh;display:grid;place-items:center;background:var(--bg);padding:24px}
+.onb .panel{width:100%;max-width:520px;background:var(--surface);border-radius:26px;box-shadow:var(--shadow-lg);padding:30px;display:flex;flex-direction:column;gap:18px;text-align:center}
+.onb .art{height:190px;border-radius:18px;display:grid;place-items:center;position:relative;overflow:hidden}
+.onb .art .ic{width:64px;height:64px;color:#fff}
+.onb .dots{display:flex;gap:7px;justify-content:center}
+.onb .dots i{width:8px;height:8px;border-radius:50%;background:var(--fill)}
+.onb .dots i.on{background:var(--accent);width:22px;border-radius:99px}
+
+/* ============ App marca (desktop) ============ */
+.app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.sidebar{background:var(--surface-2);border-right:1px solid var(--sep-2);padding:14px 10px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow:auto}
+.org{display:flex;align-items:center;gap:10px;padding:8px 10px 14px}
+.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;background:linear-gradient(135deg,#5856D6,#AF52DE);font-size:.86rem;flex-shrink:0}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;border:0;background:none;text-align:left;font-weight:500;color:var(--label);min-height:38px}
+.nav .ic{color:var(--accent-text)}
+.nav:hover{background:var(--fill-2)}
+.nav.on{background:var(--fill);font-weight:600}
+.nav .badge{margin-left:auto}
+.side-sep{height:1px;background:var(--sep-2);margin:10px 8px}
+.side-lbl{font-size:.74rem;font-weight:600;color:var(--label-3);padding:8px 10px 4px}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{position:sticky;top:0;z-index:30;background:var(--glass);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--sep-2);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 26px;min-height:54px}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--label-2)}
+.crumbs button{border:0;background:none;color:var(--accent-text);padding:0;font-weight:500}
+.crumbs .ic{width:14px;height:14px;color:var(--label-3)}
+.content{padding:26px 30px 90px;display:flex;flex-direction:column;gap:22px;max-width:1180px;width:100%}
+.ptitle{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.ptitle p{color:var(--label-2);margin-top:6px;max-width:70ch}
+@media (max-width:900px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;flex-direction:row;overflow-x:auto}.sidebar .org,.sidebar .side-lbl,.sidebar .side-sep,.sidebar .sfoot2{display:none}.content{padding:18px 16px 90px}}
+
+/* checklist */
+.check{display:flex;flex-direction:column;gap:2px}
+.ck{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--sep-2)}
+.ck:last-child{border-bottom:0}
+.ck .dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--sep);display:grid;place-items:center}
+.ck.done .dot{background:var(--green-fill);border-color:var(--green-fill);color:#fff}
+.ck.done .t{color:var(--label-2);text-decoration:line-through;text-decoration-color:var(--label-3)}
+.ck .dot .ic{width:14px;height:14px}
+
+/* aprovação */
+.qrow{display:grid;grid-template-columns:84px 1fr auto;gap:16px;align-items:center}
+.thumb{width:84px;height:112px;border-radius:12px;position:relative;display:grid;place-items:center;color:#fff;overflow:hidden}
+.thumb .ic{width:30px;height:30px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))}
+.thumb span{position:absolute;bottom:6px;right:7px;font-size:.72rem;font-weight:600;background:rgba(0,0,0,.35);padding:1px 6px;border-radius:6px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:760px){.qrow{grid-template-columns:64px 1fr}.qrow .acts{grid-column:1 / -1;justify-content:flex-start}.thumb{width:64px;height:86px}}
+
+/* stepper (wizard) */
+.wiz{display:grid;grid-template-columns:230px 1fr;gap:22px;align-items:start}
+.vsteps{display:flex;flex-direction:column;gap:4px;position:sticky;top:80px}
+.vs{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;border:0;background:none;text-align:left;font-weight:500;color:var(--label-2)}
+.vs .n{width:26px;height:26px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font-size:.8rem;font-weight:700;color:var(--label-2)}
+.vs.on{background:var(--surface);box-shadow:var(--shadow);color:var(--label);font-weight:600}
+.vs.on .n{background:var(--accent);color:#fff}
+.vs.done .n{background:var(--green-fill);color:#fff}
+@media (max-width:900px){.wiz{grid-template-columns:1fr}.vsteps{position:static;flex-direction:row;overflow-x:auto}}
+.why{display:grid;grid-template-columns:22px 1fr;gap:10px;background:var(--indigo-soft);color:var(--label);border-radius:12px;padding:12px 14px;font-size:.9rem}
+.why .ic{color:var(--indigo-fill)}
+
+/* critérios */
+.crit{display:grid;grid-template-columns:1.2fr 1.6fr 170px 110px;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--sep-2)}
+.crit:last-child{border-bottom:0}
+.crit .w{display:flex;align-items:center;gap:8px}
+.crit .w output{font-variant-numeric:tabular-nums;font-weight:700;width:38px;text-align:right}
+.crit .el{display:flex;align-items:center;gap:8px;font-size:.84rem;color:var(--label-2)}
+.crit-h{display:grid;grid-template-columns:1.2fr 1.6fr 170px 110px;gap:14px;font-size:.78rem;font-weight:600;color:var(--label-2);padding-bottom:6px;border-bottom:1px solid var(--sep-2)}
+@media (max-width:900px){.crit,.crit-h{grid-template-columns:1fr 1fr}.crit-h{display:none}}
+
+/* anel */
+.ring{position:relative;display:inline-grid;place-items:center}
+.ring svg{transform:rotate(-90deg)}
+.ring .rv{position:absolute;inset:0;display:grid;place-items:center;text-align:center;line-height:1}
+.ring .rv b{font-family:var(--font-d);font-weight:700;letter-spacing:-.02em}
+.ring .rv small{display:block;font-size:.66rem;color:var(--label-2);font-weight:600;margin-top:3px}
+
+/* resultado da checagem */
+.verdict{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start;border-radius:14px;padding:12px 14px;font-weight:600}
+.verdict .ic{width:22px;height:22px}
+.verdict.ok{background:var(--green-soft);color:var(--green)}
+.verdict.no{background:var(--orange-soft);color:var(--orange)}
+.verdict.block{background:var(--red-soft);color:var(--red)}
+.verdict span small{display:block;font-weight:400;color:var(--label-2);margin-top:2px}
+.rings2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rbox{background:var(--surface-2);border:1px solid var(--sep-2);border-radius:14px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.rbox .l{font-size:.8rem;font-weight:600}
+.rbox .s{font-size:.74rem;color:var(--label-2)}
+.tl{position:relative;height:34px;background:var(--fill);border-radius:10px;margin-top:6px}
+.tl .mk{position:absolute;top:5px;width:24px;height:24px;margin-left:-12px;border-radius:50%;display:grid;place-items:center;font-size:.72rem;font-weight:700;color:#fff;background:var(--orange-fill);border:2px solid var(--surface)}
+.tl .mk.hi{background:var(--red-fill)}.tl .mk.pf{background:var(--indigo-fill)}
+.tl-l{display:flex;justify-content:space-between;font-size:.72rem;color:var(--label-2);font-variant-numeric:tabular-nums;margin-top:3px}
+.fx{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:11px 0;border-bottom:1px solid var(--sep-2)}
+.fx:last-child{border-bottom:0}
+.fx .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.74rem;font-weight:700;color:#fff;background:var(--orange-fill)}
+.fx .n.hi{background:var(--red-fill)}.fx .n.pf{background:var(--indigo-fill)}
+.fx .t{font-size:.9rem}
+.fx .t .ts{font-variant-numeric:tabular-nums;color:var(--label-2);font-weight:600}
+.fx .how{color:var(--green);font-weight:600;font-size:.88rem;margin-top:3px;display:flex;gap:6px}
+.fx .how .ic{width:16px;height:16px;margin-top:2px}
+details.calc summary{cursor:pointer;font-weight:600;color:var(--accent-text);list-style:none;display:flex;gap:6px;align-items:center}
+details.calc summary::-webkit-details-marker{display:none}
+.ci{display:grid;grid-template-columns:1fr 70px 30px;gap:8px;align-items:center;font-size:.84rem;padding:4px 0}
+.ci .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+
+/* cartão da marca */
+.bcard{border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+.bcard .hd{background:linear-gradient(135deg,#1D1D1F,#3A3A3C);color:#fff;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.bcard .hd .eyebrow{color:#C7C7CC}
+.bcard .bd{display:flex;flex-direction:column}
+.bsec{padding:13px 18px;border-top:1px solid var(--sep-2);display:grid;grid-template-columns:30px 1fr;gap:10px}
+.bsec .bi{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff}
+.bsec h4{font-size:.9rem;margin-bottom:4px}
+.bsec ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:3px;font-size:.9rem}
+
+/* ============ App creator (telefone) ============ */
+.cwrap{min-height:100vh;display:flex;gap:40px;justify-content:center;align-items:flex-start;padding:24px 20px 40px;background:var(--bg)}
+.device{width:402px;flex-shrink:0;border-radius:54px;background:#1D1D1F;padding:12px;box-shadow:var(--shadow-lg),inset 0 0 0 1px #48484A}
+.screen{height:clamp(620px,calc(100vh - 84px),820px);border-radius:44px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;position:relative}
+.sbar{height:48px;display:flex;justify-content:space-between;align-items:center;padding:12px 30px 0;font-weight:600;font-size:.92rem;flex-shrink:0;background:var(--bg)}
+.sbar .isl{position:absolute;left:50%;top:11px;transform:translateX(-50%);width:120px;height:34px;border-radius:20px;background:#000}
+.sbar .si{display:flex;gap:5px;align-items:center}
+.sbar .si i{display:inline-block;width:22px;height:11px;border:1.5px solid var(--label);border-radius:3px;position:relative}
+.sbar .si i::after{content:"";position:absolute;inset:1.5px;right:5px;background:var(--label);border-radius:1px}
+.scroll{flex:1;overflow:auto;padding:4px 16px 24px;display:flex;flex-direction:column;gap:14px}
+.navbar{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 0;min-height:40px;flex-shrink:0;background:var(--bg)}
+.navbar .back{display:flex;align-items:center;gap:2px;border:0;background:none;color:var(--accent-text);font-size:1rem;padding:6px 8px;border-radius:8px;min-height:44px}
+.largetitle{font-family:var(--font-d);font-size:2.05rem;font-weight:700;letter-spacing:-.025em;padding:2px 2px 0}
+.tabbar{display:grid;grid-template-columns:repeat(3,1fr);background:var(--glass);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:1px solid var(--sep-2);padding:6px 6px 26px;flex-shrink:0}
+.tabbar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.68rem;font-weight:600;color:var(--label-3);padding:4px;min-height:44px}
+.tabbar button .ic{width:24px;height:24px}
+.tabbar button.on{color:var(--accent)}
+.bottomcta{padding:12px 16px 30px;background:var(--glass);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:1px solid var(--sep-2);display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.bottomcta .btn{min-height:50px;font-size:1.02rem;border-radius:14px}
+.ccard{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow);border:0;text-align:left;width:100%}
+button.ccard:hover{background:var(--surface-2)}
+.ccard .nx{display:flex;align-items:center;gap:6px;color:var(--accent-text);font-weight:600;font-size:.88rem}
+.drop{border:2px dashed var(--sep);border-radius:18px;padding:26px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;background:var(--surface)}
+.drop.has{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ic{width:38px;height:38px;color:var(--accent-text)}
+.tlst{display:flex;flex-direction:column;gap:0}
+.tls{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:8px 0;position:relative}
+.tls .d{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--fill);color:var(--label-2);font-size:.76rem;font-weight:700;z-index:1}
+.tls.done .d{background:var(--green-fill);color:#fff}
+.tls.now .d{background:var(--accent);color:#fff}
+.tls:not(:last-child)::after{content:"";position:absolute;left:12.5px;top:32px;bottom:-6px;width:2px;background:var(--sep-2)}
+.tls .d .ic{width:14px;height:14px}
+.cside{max-width:340px;display:flex;flex-direction:column;gap:14px;padding-top:30px}
+@media (max-width:860px){.cside{display:none}.cwrap{padding:0}.device{width:100%;border-radius:0;padding:0;box-shadow:none}.screen{height:100vh;border-radius:0}.sbar .isl{display:none}}
+
+/* ============ Demonstração guiada ============ */
+.tourbtn{position:fixed;right:22px;bottom:22px;z-index:70;display:flex;align-items:center;gap:8px;background:var(--glass-dark);color:#fff;border:0;border-radius:999px;padding:11px 16px 11px 13px;font-weight:600;box-shadow:var(--shadow-lg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.tourbtn .ic{color:#FFD60A}
+.tour{position:fixed;right:22px;bottom:22px;z-index:70;width:360px;max-width:calc(100vw - 32px);background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--sep-2)}
+.tour .th{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px}
+.tour .tb{padding:0 16px 12px;display:flex;flex-direction:column;gap:8px}
+.tour .tstep{display:flex;flex-direction:column;gap:6px;background:var(--surface-2);border:1px solid var(--sep-2);border-radius:14px;padding:12px}
+.tour .obs{display:grid;grid-template-columns:18px 1fr;gap:8px;font-size:.86rem;color:var(--label-2)}
+.tour .obs .ic{width:17px;height:17px;color:var(--indigo-fill);margin-top:1px}
+.tour .tprog{display:flex;gap:4px}
+.tour .tprog i{flex:1;height:4px;border-radius:9px;background:var(--fill)}
+.tour .tprog i.on{background:var(--accent)}
+.tour .tf{display:flex;justify-content:space-between;gap:8px;padding:10px 16px 14px;border-top:1px solid var(--sep-2)}
+.tour .tl2{max-height:170px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.tour .tl2 button{border:0;background:none;text-align:left;display:grid;grid-template-columns:22px 1fr;gap:8px;padding:6px 6px;border-radius:8px;font-size:.86rem;color:var(--label-2)}
+.tour .tl2 button:hover{background:var(--fill-2)}
+.tour .tl2 button.on{color:var(--label);font-weight:600;background:var(--accent-soft)}
+.tour .tl2 button b{font-variant-numeric:tabular-nums;color:var(--label-3)}
+@media (max-width:860px){.tour{right:16px;bottom:16px}}
+
+/* scatter */
+.chart svg{width:100%;height:auto;display:block}
+.chart .grid{stroke:var(--sep-2)}
+.chart .axis{fill:var(--label-2);font-size:11px}
+.chart .pt{fill:var(--fill)}
+.chart .pt.top{fill:var(--accent)}
+.chart .pt.ours{stroke:var(--green-fill);stroke-width:3}
+.feed{display:flex;flex-direction:column;gap:10px;font-size:.88rem}
+.feed div{display:grid;grid-template-columns:48px 1fr;gap:8px}
+.feed .t{font-variant-numeric:tabular-nums;color:var(--label-3);font-size:.8rem;padding-top:1px}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheet"></div>
+<div id="tour"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script>
+/* ================================================================
+   Cérebro da Marca · protótipo v2 · motor e dados (fictícios)
+   ================================================================ */
+const KEY='cerebro-da-marca-v2';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+const dec=(x,d=1)=>(Math.round(x*10**d)/10**d).toFixed(d).replace('.',',');
+const pct=x=>Math.round(x*100)+'%';
+const brl=x=>'R$ '+Math.round(x).toLocaleString('pt-BR');
+const mmss=t=>`${Math.floor(t/60)}:${String(Math.max(0,Math.round(t%60))).padStart(2,'0')}`;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const last=v=>v.versions[v.versions.length-1];
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function nowLabel(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+
+const CREATORS=[
+  {id:'ana',  name:'Ana Lima',     handle:'@analima.rotina', fol:'42 mil', hue:340, nota:88, primeira:.80, entregas:10},
+  {id:'bruno',name:'Bruno Costa',  handle:'@brunotreina',    fol:'18 mil', hue:205, nota:76, primeira:.60, entregas:5},
+  {id:'carla',name:'Carla Mendes', handle:'@carlamendes',    fol:'65 mil', hue:28,  nota:91, primeira:.90, entregas:21},
+  {id:'diego',name:'Diego Rocha',  handle:'@diegorocha.fit', fol:'27 mil', hue:150, nota:70, primeira:.40, entregas:5},
+  {id:'julia',name:'Júlia Prado',  handle:'@juliaprado',     fol:'12 mil', hue:268, nota:84, primeira:.75, entregas:8},
+  {id:'rafa', name:'Rafa Nunes',   handle:'@rafanunes',      fol:'33 mil', hue:95,  nota:73, primeira:.55, entregas:9},
+];
+const cr=id=>CREATORS.find(c=>c.id===id);
+
+const GUIDE_TEMPLATES={
+  saude:{posicionamento:'Energia e bem-estar com base em ciência, sem exageros.',publico:'Adultos de 25 a 40 anos, classes A e B, rotina ativa.',tom:'Leve, confiante e informativo, sem promessas.',
+    podeFalar:['Ingredientes naturais','Ajuda na disposição do dia a dia','Rotina mais equilibrada'],naoPode:['Promessas de cura ou tratamento','Resultado garantido ou imediato','Comparar com remédios'],
+    visual:['Produto com o rótulo de frente','Ambiente limpo e iluminado'],obrigatorios:['#publi nos primeiros segundos ou na legenda','Link na bio']},
+  moda:{posicionamento:'Peças atemporais que duram anos.',publico:'Mulheres de 25 a 45 anos, classes A e B.',tom:'Acolhedor, estético e natural.',
+    podeFalar:['Qualidade do tecido','Versatilidade da peça','Produção responsável'],naoPode:['Chamar de "barato"','Comparar com marcas concorrentes pelo nome'],
+    visual:['Luz natural','Peça sem amassados','Cenário neutro'],obrigatorios:['#publi','Marcar o perfil da marca']},
+  geral:{posicionamento:'Produto de qualidade que resolve um problema real do cliente.',publico:'Adultos de 25 a 45 anos.',tom:'Próximo, claro e confiável.',
+    podeFalar:['Benefício principal do produto','Como usar no dia a dia'],naoPode:['Promessas que o produto não cumpre','Falar mal de concorrentes'],
+    visual:['Produto aparecendo com clareza','Boa iluminação'],obrigatorios:['#publi','Link ou cupom da campanha']},
+};
+
+function genCriteria(b,prev){
+  const keep=id=>(prev||[]).find(c=>c.id===id);
+  const mk=(id,label,weight,elim,checks)=>{const p=keep(id);return {id,label,weight:p?p.weight:weight,elim:p?p.elim:elim,checks};};
+  const base=[
+    mk('mensagem','Mensagem principal da marca',20,false,[`Cita um diferencial: ${b.podeFalar.slice(0,2).join(' · ')||'—'}`,`Coerente com: "${b.posicionamento||'—'}"`]),
+    mk('tom','Tom de voz',15,false,[`Tom esperado: ${b.tom||'—'}`]),
+    mk('visual','Regras visuais',20,false,b.visual.slice()),
+    mk('proibidos','Nada do que a marca não permite',25,true,b.naoPode.slice()),
+    mk('obrigatorios','Itens obrigatórios',10,false,b.obrigatorios.slice()),
+    mk('publico','Fala com o público da marca',10,false,[`Público: ${b.publico||'—'}`]),
+  ];
+  return base.concat((prev||[]).filter(c=>c.custom));
+}
+const PERF_DEFAULT=()=>[
+  {id:'gancho',label:'Gancho nos 3 primeiros segundos',weight:30,checks:['Mostra o produto ou faz uma pergunta logo no início']},
+  {id:'ritmo',label:'Ritmo e cortes',weight:20,checks:['Sem trechos longos parados (mais de 8 s sem corte)']},
+  {id:'duracao',label:'Duração',weight:15,checks:['Dentro da duração ideal da campanha']},
+  {id:'cta',label:'Chamada para ação',weight:20,checks:['Diz claramente o que a pessoa deve fazer, com texto na tela']},
+  {id:'legenda',label:'Legenda e texto na tela',weight:15,checks:['Fala legendada e texto de apoio legível']},
+];
+function campCriteria(b,c){
+  return JSON.parse(JSON.stringify(b.criteria)).concat([
+    {id:'camp_msg',label:'Mensagem da campanha',weight:15,elim:false,checks:[c.mensagem||'—']},
+    {id:'camp_cta',label:'Chamada e cupom da campanha',weight:10,elim:false,checks:[c.cta||'—',c.cupom&&c.cupom!=='—'?`Cupom ${c.cupom}`:'Sem cupom']},
+  ]);
+}
+
+/* ---------- avaliação (simulada: notas vêm de cenários) ---------- */
+const Q={
+  ruim: {mensagem:62,tom:70,visual:48,proibidos:35,obrigatorios:55,publico:72,camp_msg:58,camp_cta:50,gancho:40,ritmo:62,duracao:70,cta:45,legenda:55,_:62},
+  medio:{mensagem:84,tom:86,visual:78,proibidos:90,obrigatorios:80,publico:84,camp_msg:78,camp_cta:82,gancho:64,ritmo:76,duracao:88,cta:70,legenda:72,_:78},
+  bom:  {mensagem:93,tom:91,visual:95,proibidos:100,obrigatorios:100,publico:89,camp_msg:91,camp_cta:96,gancho:86,ritmo:85,duracao:93,cta:89,legenda:87,_:91},
+};
+const QLABEL={ruim:'Vídeo com problemas',medio:'Vídeo mediano',bom:'Vídeo bom'};
+const DUR={ruim:128,medio:96,bom:79};
+function wavg(items){const w=items.reduce((a,i)=>a+Number(i.weight||0),0);return w?Math.round(items.reduce((a,i)=>a+i.score*Number(i.weight||0),0)/w):0}
+function findingText(id,label,b,c,dur){
+  const T={gancho:0,obrigatorios:4,legenda:9,mensagem:15,ritmo:20,visual:24,tom:33,proibidos:41,publico:48,camp_msg:56,cta:dur-14,camp_cta:dur-9,duracao:dur-1};
+  const t=T[id]??Math.round(dur*.6);
+  const cup=c.cupom&&c.cupom!=='—'?` · ${c.cupom}`:'';
+  const X={
+    mensagem:[`O diferencial da marca não aparece: "${b.podeFalar[0]||'mensagem principal'}".`,`Diga isso em uma frase, do seu jeito, perto de ${mmss(15)}.`],
+    tom:[`Trecho com tom diferente do da marca (${(b.tom||'').toLowerCase()}).`,`Fale como falaria com uma amiga, sem exagero.`],
+    visual:[`Regra visual não atendida: ${b.visual[0]||'regra visual da marca'}.`,`Regrave só esta cena.`],
+    proibidos:[`Frase que a marca não permite (${(b.naoPode[0]||'item proibido').toLowerCase()}).`,`Troque por algo que a marca permite: "${b.podeFalar[0]||'benefício permitido'}".`],
+    obrigatorios:[`Falta um item obrigatório: ${b.obrigatorios[0]||'#publi'}.`,`Coloque na tela nos primeiros segundos ou na legenda.`],
+    publico:[`As referências não falam com o público da marca (${b.publico}).`,`Traga um exemplo da rotina desse público.`],
+    camp_msg:[`A mensagem da campanha ("${c.mensagem||'—'}") aparece tarde ou não aparece.`,`Traga essa ideia para a primeira metade do vídeo.`],
+    camp_cta:[`Chamada da campanha incompleta: falta "${c.cta||'chamada'}${cup}".`,`Feche o vídeo com a chamada completa, falada e escrita.`],
+    gancho:[`Os 3 primeiros segundos não mostram o produto nem fazem uma pergunta.`,`Comece com o produto na mão ou com uma pergunta direta.`],
+    ritmo:[`Trecho longo sem corte (${mmss(20)} a ${mmss(32)}).`,`Corte ou acelere esse trecho.`],
+    duracao:[`O vídeo tem ${mmss(dur)}; o ideal nesta campanha é ${c.duracao||'60 a 90 s'}.`,`Tire as partes que repetem a mesma ideia.`],
+    cta:[`A chamada final passa rápido demais.`,`Segure a chamada por pelo menos 3 segundos, com texto na tela.`],
+    legenda:[`Trechos falados sem legenda.`,`Ative a legenda automática e revise os erros.`],
+  }[id]||[`O critério "${label}" não foi totalmente atendido.`,`Revise este ponto com base no guia da marca.`];
+  return {t:clamp(t,0,dur),text:X[0],fix:X[1]};
+}
+function analyze(camp,b,quality,seed){
+  const r=rng(seed||1), j=()=>Math.round((r()-.5)*8), dur=DUR[quality];
+  const items=camp.criteria.map(c=>({id:c.id,label:c.label,weight:c.weight,elim:!!c.elim,score:clamp((Q[quality][c.id]??Q[quality]._)+j(),0,100)}));
+  const pitems=camp.perf.map(c=>({id:c.id,label:c.label,weight:c.weight,score:clamp((Q[quality][c.id]??Q[quality]._)+j(),0,100)}));
+  const ader=wavg(items), perf=wavg(pitems);
+  const all=[];
+  items.filter(i=>i.score<80&&Number(i.weight)>0).forEach(i=>all.push({crit:i.id,label:i.label,kind:'aderencia',score:i.score,w:Number(i.weight),sev:(i.elim&&i.score<60)?'block':i.score<60?'alta':'media',...findingText(i.id,i.label,b,camp,dur)}));
+  pitems.filter(i=>i.score<75&&Number(i.weight)>0).forEach(i=>all.push({crit:i.id,label:i.label,kind:'performance',score:i.score,w:Number(i.weight),sev:'media',...findingText(i.id,i.label,b,camp,dur)}));
+  const rank=f=>(f.sev==='block'?0:f.kind==='aderencia'?1:2)*1000-(100-f.score)*f.w/10;
+  all.sort((a,b)=>rank(a)-rank(b));
+  const findings=all.slice(0,5).sort((a,b)=>a.t-b.t);
+  const blockedBy=items.filter(i=>i.elim&&Number(i.weight)>0&&i.score<60).map(i=>i.label);
+  const blocked=blockedBy.length>0, pass=!blocked&&ader>=camp.minScore;
+  return {quality,ader,perf,items,pitems,findings,minor:all.length-findings.length,blocked,blockedBy,pass,dur,min:camp.minScore};
+}
+
+/* ---------- campanhas anteriores ---------- */
+const PAST_NAMES=['Lu Andrade','Beto Reis','Marina Sol','Caio Lopes','Duda Faria','Nina Castro','Téo Alves','Bia Moura','Gui Santos','Lara Pires','Vini Braga','Sofia Ramos','Leo Matos','Iris Cunha','Davi Prado','Mel Rocha','Otto Lima','Clara Dias','Pedro Vaz','Alice Neves'];
+function genPastVideos(n,seed,before){
+  const r=rng(seed), out=[];
+  for(let i=0;i<n;i++){
+    const perf=Math.round(40+r()*55), ader=Math.round(58+r()*38);
+    const ctr=+(clamp(.45+perf/100*1.9+(r()-.5)*.55,.2,4)).toFixed(2);
+    const views=Math.round(20000+r()*25000);
+    const vendas=Math.max(0,Math.round(views*ctr/100*(.04+perf/100*.04+(r()-.5)*.02)));
+    out.push({creator:PAST_NAMES[(i+seed)%PAST_NAMES.length],ader,perf,views,ctr,vendas,rounds:0,days:0});
+  }
+  const nBack=Math.round(n*(before?.3:.1));
+  const back=new Set(out.map((v,i)=>i).sort((a,b)=>out[a].ader-out[b].ader).slice(0,nBack));
+  out.forEach((v,i)=>{ if(back.has(i)){ v.rounds=before?(r()<.7?2:3):1; v.days=before?7+Math.round(r()*2):+(2.5+r()).toFixed(1);} else { v.days=before?3+Math.round(r()*2):+(1+r()*.8).toFixed(1);} });
+  return out;
+}
+
+/* ---------- estado inicial ---------- */
+function seed(){
+  const vitta={id:'vitta',name:'Vitta Energia',seg:'Suplemento · saúde',hue:210,
+    posicionamento:'Energia limpa, sem cafeína, para quem treina, estuda e trabalha.',publico:'Adultos de 20 a 40 anos, classes A e B, rotina ativa.',tom:'Leve, confiante e baseado em ciência, sem exagero.',
+    podeFalar:['Energia sem cafeína','Feito com ingredientes naturais','Ajuda na disposição do dia a dia'],
+    naoPode:['Promessas de cura ou tratamento','"Energia na hora" ou efeito imediato','"Pílula mágica" ou resultado garantido','Comparar com remédios'],
+    visual:['Pó totalmente dissolvido, sem resto no fundo','Copo ou garrafa de vidro, nada de plástico descartável','Embalagem com o rótulo de frente'],
+    obrigatorios:['#publi nos primeiros 5 segundos ou na legenda','Cupom da campanha','Link na bio'],minScore:75,guideDirty:false};
+  const nuvem={id:'nuvem',name:'Nuvem Tricot',seg:'Moda · tricô artesanal',hue:28,
+    posicionamento:'Tricô artesanal: peças atemporais feitas à mão.',publico:'Mulheres de 25 a 45 anos, classes A e B, que valorizam slow fashion.',tom:'Acolhedor, delicado e estético.',
+    podeFalar:['Feito à mão','Peças que duram anos','Produção em pequena escala'],
+    naoPode:['Chamar de "barato" ou "promoção relâmpago"','Comparar com fast fashion de marcas nomeadas'],
+    visual:['Luz natural','Peça sem amassados','Cenário neutro e limpo'],
+    obrigatorios:['#publi','Marcar @nuvemtricot'],minScore:70,guideDirty:false};
+  vitta.criteria=genCriteria(vitta); nuvem.criteria=genCriteria(nuvem);
+  const perf=PERF_DEFAULT();
+  const c1={id:'c1',brandId:'vitta',name:'Volta às aulas',objetivo:'Vendas com cupom',mensagem:'Energia sem cafeína para a rotina de estudos',cta:'Use o cupom no link da bio',cupom:'VITTA10',formato:'Reels e TikTok',duracao:'60 a 90 s',prazo:'10/10',pagamento:800,
+    ganchos:'"Estudo 6 horas por dia sem café. Te mostro como."\n"O que eu tomo antes da aula das 7h"',minScore:75,invites:{ana:'aceito',bruno:'aceito',carla:'aceito',diego:'aceito',julia:'aceito',rafa:'aceito'},created:'20/09'};
+  const c2={id:'c2',brandId:'nuvem',name:'Coleção Inverno',objetivo:'Lançamento',mensagem:'Peças feitas à mão que duram anos',cta:'Conheça a coleção no link da bio',cupom:'—',formato:'Reels',duracao:'30 a 60 s',prazo:'15/10',pagamento:500,
+    ganchos:'"Esse suéter levou 12 horas para ser feito."',minScore:70,invites:{ana:'convidado',carla:'aceito',julia:'aceito',bruno:'aceito',diego:'aceito',rafa:'aceito'},created:'22/09'};
+  c1.criteria=campCriteria(vitta,c1); c1.perf=JSON.parse(JSON.stringify(perf));
+  c2.criteria=campCriteria(nuvem,c2); c2.perf=JSON.parse(JSON.stringify(perf));
+  const B={vitta,nuvem}, C={c1,c2};
+  const defs=[
+    ['c1','carla',['bom'],'aprovado',0,1.0],
+    ['c1','julia',['ruim','bom'],'aprovado',0,2.0],
+    ['c1','bruno',['ruim','medio'],'enviado',0,null],
+    ['c1','diego',['medio'],'enviado',0,null],
+    ['c1','rafa',['ruim','medio'],'ajuste',1,null,'O copo de plástico aparece no começo. Use copo de vidro, como está no guia.'],
+    ['c2','carla',['bom'],'aprovado',0,1.0],
+    ['c2','julia',['medio','bom'],'enviado',0,null],
+    ['c2','bruno',['medio'],'aprovado',1,3.0],
+    ['c2','diego',['bom'],'aprovado',0,1.2],
+    ['c2','rafa',['medio'],'aprovado',0,1.6],
+  ];
+  let k=10;
+  const videos=defs.map(([cid,crid,qs,status,rounds,days,note])=>{const camp=C[cid],b=B[camp.brandId];
+    return {id:'v'+(k++),campaignId:cid,creatorId:crid,status,roundsBrand:rounds,days,note:note||'',boosted:false,versions:qs.map((q,i)=>({n:i+1,at:'—',...analyze(camp,b,q,k*7+i)}))};});
+  return {
+    v:2, route:'site', role:null, me:'ana',
+    onb:{b:false,c:false}, tips:{}, progress:{critTested:false,createdCampaign:false,approvedOne:false,resultsViewed:false},
+    brands:[vitta,nuvem], perf, campaigns:[c1,c2], videos,
+    past:[
+      {id:'p1',name:'Lançamento (antes da plataforma)',brandId:'vitta',when:'jun/2026',before:true,videos:genPastVideos(10,7,true)},
+      {id:'p2',name:'Outono (antes da plataforma)',brandId:'nuvem',when:'abr/2026',before:true,videos:genPastVideos(8,11,true)},
+    ],
+    results:{},
+    feed:[
+      {t:'09:12',x:'Carla Mendes teve o vídeo aprovado em Volta às aulas. Pagamento liberado.'},
+      {t:'09:40',x:'Júlia Prado corrigiu 3 pontos na checagem antes de enviar.'},
+      {t:'10:05',x:'A marca pediu ajuste a Rafa Nunes: copo de plástico no começo do vídeo.'},
+    ],
+  };
+}
+
+/* ---------- métricas ---------- */
+const brand=id=>S.brands.find(b=>b.id===id);
+const camp=id=>S.campaigns.find(c=>c.id===id);
+const myVideo=cid=>S.videos.find(v=>v.campaignId===cid&&v.creatorId===S.me);
+const SENT=['enviado','aprovado','ajuste'];
+function metrics(bid){
+  const camps=S.campaigns.filter(c=>bid==='all'||c.brandId===bid), ids=new Set(camps.map(c=>c.id));
+  const vids=S.videos.filter(v=>ids.has(v.campaignId));
+  const sent=vids.filter(v=>SENT.includes(v.status)), appr=vids.filter(v=>v.status==='aprovado'), returned=vids.filter(v=>v.roundsBrand>0);
+  const byCrit={}; vids.forEach(v=>v.versions.forEach(x=>x.findings.forEach(f=>{byCrit[f.label]=(byCrit[f.label]||0)+1})));
+  return {camps,vids,sent,appr,
+    first:appr.length?appr.filter(v=>v.roundsBrand===0).length/appr.length:null,
+    rounds:returned.length?avg(returned.map(v=>v.roundsBrand)):null,
+    days:appr.length?avg(appr.map(v=>v.days)):null,
+    ader:sent.length?avg(sent.map(v=>last(v).ader)):null,
+    checks:vids.reduce((a,v)=>a+v.versions.length,0),
+    caught:vids.reduce((a,v)=>a+v.versions.slice(0,-1).reduce((b,x)=>b+x.findings.length+(x.minor||0),0),0),
+    queue:vids.filter(v=>v.status==='enviado').length,
+    adjust:vids.filter(v=>v.status==='ajuste').length, byCrit};
+}
+function allCampOptions(){return [...S.past.map(p=>({id:p.id,label:`${brand(p.brandId).name} · ${p.name}`})),...S.campaigns.map(c=>({id:c.id,label:`${brand(c.brandId).name} · ${c.name} (com a plataforma)`}))]}
+function campStats(id){
+  const p=S.past.find(x=>x.id===id); let rows,name;
+  if(p){rows=p.videos;name=`${brand(p.brandId).name} · ${p.name}`}
+  else{const c=camp(id);name=`${brand(c.brandId).name} · ${c.name}`;const res=S.results[id]||{};
+    rows=S.videos.filter(v=>v.campaignId===id&&SENT.includes(v.status)).map(v=>{const x=last(v),r=res[v.id];return {creator:cr(v.creatorId).name,ader:x.ader,perf:x.perf,rounds:v.roundsBrand,days:v.status==='aprovado'?v.days:null,views:r?r.views:null,ctr:r?r.ctr:null,vendas:r?r.vendas:null}})}
+  const withDays=rows.filter(r=>r.days!=null), withRes=rows.filter(r=>r.vendas!=null), back=rows.filter(r=>r.rounds>0);
+  return {id,name,rows,n:rows.length,first:rows.length?rows.filter(r=>r.rounds===0).length/rows.length:null,rounds:back.length?avg(back.map(r=>r.rounds)):0,days:withDays.length?avg(withDays.map(r=>r.days)):null,
+    ader:rows.length?avg(rows.map(r=>r.ader)):null,perf:rows.length?avg(rows.map(r=>r.perf)):null,ctr:withRes.length?avg(withRes.map(r=>r.ctr)):null,vendas:withRes.length?withRes.reduce((a,r)=>a+r.vendas,0):null,hasRes:withRes.length>=4};
+}
+function pearson(xs,ys){const mx=avg(xs),my=avg(ys);let a=0,b=0,c=0;xs.forEach((x,i)=>{a+=(x-mx)*(ys[i]-my);b+=(x-mx)**2;c+=(ys[i]-my)**2});return b&&c?a/Math.sqrt(b*c):0}
+
+/* ---------- glossário (ajuda contextual) ---------- */
+const GLOSS={
+  aderencia:{t:'Aderência à marca',x:'Quanto o vídeo segue o guia da marca e o briefing da campanha: mensagem, tom, regras visuais, o que não pode ser dito e os itens obrigatórios. Abaixo da nota mínima, o creator não consegue enviar.'},
+  performance:{t:'Potencial de performance',x:'Uma estimativa de quanto o vídeo tende a performar, com base em boas práticas: gancho nos primeiros segundos, ritmo, duração, chamada para ação e legenda. Orienta o creator, mas não bloqueia o envio.'},
+  minima:{t:'Nota mínima',x:'A aderência mínima para o creator poder enviar o vídeo. A marca escolhe esse valor no guia. Quanto mais alta, mais rígida a checagem.'},
+  eliminatorio:{t:'Critério eliminatório',x:'Um critério que, se falhar, bloqueia o envio mesmo que a nota geral seja boa. Use para o que nunca pode ir ao ar, como promessas de cura.'},
+  primeira:{t:'Aprovados de primeira',x:'Parte dos vídeos aprovados sem a marca precisar pedir ajuste. Antes da plataforma, cerca de 70% (3 em cada 10 voltavam, segundo as entrevistas).'},
+  rodadas:{t:'Rodadas de ajuste',x:'Quantas vezes, em média, a marca devolve um vídeo antes de aprovar, contando só os vídeos devolvidos. Nas entrevistas, eram cerca de 2.'},
+  tempo:{t:'Tempo até aprovar',x:'Dias entre o envio do vídeo e a aprovação da marca. Nas entrevistas, um ciclo de ajustes levava cerca de uma semana.'},
+  corrigidos:{t:'Problemas corrigidos antes de chegar',x:'Pontos que a IA apontou e o próprio creator corrigiu antes de enviar. Cada um é uma ida e volta que a marca não precisou fazer.'},
+  entrega:{t:'Nota de entrega',x:'Média da aderência dos vídeos que o creator já enviou na plataforma. A marca vê essa nota na hora de convidar creators.'},
+};
+
+/* ================================================================
+   Interface base: ícones, componentes, avisos, folhas e demonstração
+   ================================================================ */
+const ICONS={
+  home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9v11h4.5v-6h4v6h4.5V9"/>',
+  inbox:'<path d="M3.5 13.5h4.5l1.5 2.5h5l1.5-2.5h4.5"/><path d="M6 4.5h12l2.5 9V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-5.5z"/>',
+  megaphone:'<path d="M3.5 10v4a1 1 0 0 0 1 1h2.5l6.5 4.5v-15L7 9H4.5a1 1 0 0 0-1 1z"/><path d="M17 8.5a5 5 0 0 1 0 7"/>',
+  book:'<path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a1.5 1.5 0 0 0 1.5 1H19"/><path d="M9 7.5h6"/>',
+  chart:'<path d="M5 20v-8"/><path d="M11 20V5"/><path d="M17 20v-11"/><path d="M3 20.5h18"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4"/><path d="M12 16.9h.01"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/>',
+  spark:'<path d="M12 3.5l1.6 4.3 4.4 1.7-4.4 1.7L12 15.5l-1.6-4.3L6 9.5l4.4-1.7z"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+  video:'<rect x="3" y="6" width="12.5" height="12" rx="2.5"/><path d="M15.5 10.5 21 7.5v9l-5.5-3"/>',
+  upload:'<path d="M12 15V4.5"/><path d="M7.5 9 12 4.5 16.5 9"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  checkc:'<circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.8 2.8L16.2 9.6"/>',
+  x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  xoct:'<path d="M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/>',
+  warn:'<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5"/><path d="M12 17.2h.01"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
+  card:'<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M7 15h3"/>',
+  right:'<path d="M9.5 5.5l6.5 6.5-6.5 6.5"/>',
+  left:'<path d="M14.5 5.5 8 12l6.5 6.5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  user:'<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+  undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  bolt:'<path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/>',
+  shield:'<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M8.8 12l2.3 2.3 4.2-4.6"/>',
+  list:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+  doc:'<path d="M6.5 3H14l4.5 4.5V20a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4.5h4.5"/><path d="M8.5 13h7M8.5 16.5h5"/>',
+  play:'<path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/>',
+  logout:'<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16.5 5.5 12 10 7.5"/><path d="M5.5 12H15"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  mail:'<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/>',
+  arrow:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+  bell:'<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  flag:'<path d="M5 21V4"/><path d="M5 4.5h11l-2 4 2 4H5"/>',
+  cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  money:'<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.8"/>',
+  trend:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  msg:'<path d="M4 5h16v11H9.5L4 20z"/>',
+  repeat:'<path d="M17 3l3 3-3 3"/><path d="M4 12V9a3 3 0 0 1 3-3h13"/><path d="M7 21l-3-3 3-3"/><path d="M20 12v3a3 3 0 0 1-3 3H4"/>',
+  phone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  users:'<circle cx="9" cy="8.5" r="3.3"/><path d="M3 19.5a6 6 0 0 1 12 0"/><path d="M15.5 5.5a3.2 3.2 0 0 1 0 6.3"/><path d="M17.5 13.8a6 6 0 0 1 3.5 5.7"/>',
+  wand:'<path d="M4 20 15 9"/><path d="M14 3.5v3M12.5 5h3M19 9v3M17.5 10.5h3"/>',
+  building:'<path d="M4.5 21V6.5L12 3v18"/><path d="M12 21h7.5V9.5L12 7.5"/><path d="M7.5 9.5h1.5M7.5 13h1.5M7.5 16.5h1.5M15 13h1.5M15 16.5h1.5"/>',
+  grid:'<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  sliders:'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+};
+const ic=(n,cls='')=>`<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||''}</svg>`;
+
+function ring(v,color,size=84,label='',stroke=9){
+  const r=(size-stroke)/2, c=2*Math.PI*r, off=c*(1-clamp(v,0,100)/100);
+  return `<div class="ring" style="width:${size}px;height:${size}px" role="img" aria-label="${esc(label)}: ${v} de 100"><svg width="${size}" height="${size}" aria-hidden="true"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--fill)" stroke-width="${stroke}"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg><div class="rv"><div><b style="font-size:${Math.round(size*.3)}px">${v}</b>${label&&size>=70?`<small>${esc(label)}</small>`:''}</div></div></div>`;
+}
+const aderColor=(v,min)=>v>=min?'var(--green-fill)':v>=60?'var(--orange-fill)':'var(--red-fill)';
+const perfColor=v=>v>=75?'var(--indigo-fill)':v>=60?'var(--orange-fill)':'var(--red-fill)';
+function vStatus(v){
+  if(!v) return `<span class="chip">${ic('clock')}Sem vídeo</span>`;
+  return {checando:`<span class="chip warn">${ic('spark')}Checando</span>`,enviado:`<span class="chip acc">${ic('inbox')}Na fila da marca</span>`,aprovado:`<span class="chip good">${ic('checkc')}Aprovado</span>`,ajuste:`<span class="chip bad">${ic('undo')}Ajuste pedido</span>`}[v.status]||'';
+}
+function thumb(v){const c=cr(v.creatorId),x=last(v);return `<div class="thumb" style="background:linear-gradient(150deg,hsl(${c.hue} 62% 58%),hsl(${(c.hue+40)%360} 50% 30%))" aria-hidden="true">${ic('play')}<span>${mmss(x.dur)}</span></div>`}
+function infoBtn(k,label){return `<button class="info" data-act="sheet" data-type="gloss" data-k="${k}" aria-label="O que é ${esc(label||GLOSS[k].t)}?">${ic('info')}</button>`}
+function tip(k,title,text){ if(S.tips[k]) return ''; return `<div class="tip" role="note">${ic('spark')}<div><b>${esc(title)}</b><span class="small">${text}</span></div><button class="iconbtn" style="width:30px;height:30px" data-act="dismissTip" data-k="${k}" aria-label="Fechar dica">${ic('x','sm')}</button></div>`; }
+function why(text){return `<div class="why">${ic('info')}<span>${text}</span></div>`}
+function empty(icon,title,text,btn){return `<div class="card"><div class="empty">${ic(icon)}<h3>${esc(title)}</h3><p class="muted small" style="max-width:44ch">${text}</p>${btn||''}</div></div>`}
+
+function scatter(rows){
+  const W=560,H=280,P={l:46,r:16,t:14,b:42}, ymax=Math.max(...rows.map(r=>r.vendas))*1.12||1;
+  const X=v=>P.l+(v-30)/70*(W-P.l-P.r), Y=v=>H-P.b-v/ymax*(H-P.t-P.b);
+  const k=Math.min(5,Math.floor(rows.length/2)), realTop=new Set(rows.slice().sort((a,b)=>b.vendas-a.vendas).slice(0,k)), ourTop=new Set(rows.slice().sort((a,b)=>b.perf-a.perf).slice(0,k));
+  const ty=[0,.25,.5,.75,1].map(f=>Math.round(ymax/1.12*f));
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Nota de performance da IA contra vendas reais">
+    ${ty.map(t=>`<line class="grid" x1="${P.l}" x2="${W-P.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="axis" x="${P.l-8}" y="${Y(t)+4}" text-anchor="end">${t}</text>`).join('')}
+    ${[30,50,70,90].map(t=>`<text class="axis" x="${X(t)}" y="${H-P.b+18}" text-anchor="middle">${t}</text>`).join('')}
+    <text class="axis" x="${(W+P.l)/2}" y="${H-4}" text-anchor="middle">Nota de performance dada pela IA, sem ver o resultado</text>
+    <text class="axis" x="12" y="${H/2}" text-anchor="middle" transform="rotate(-90 12 ${H/2})">Vendas reais</text>
+    ${rows.map(r=>`<circle class="pt ${realTop.has(r)?'top':''} ${ourTop.has(r)?'ours':''}" cx="${X(r.perf)}" cy="${Y(r.vendas)}" r="${ourTop.has(r)?8:6}"><title>${esc(r.creator)}: nota ${r.perf}, ${r.vendas} vendas</title></circle>`).join('')}
+  </svg>`;
+}
+
+/* ---------- avisos (toast) com desfazer ---------- */
+function toast(msg,action){UI.toast={msg,action};renderToast();clearTimeout(toast._t);toast._t=setTimeout(()=>{UI.toast=null;renderToast()},action?7000:3200)}
+function renderToast(){const t=$('#toast');if(!UI.toast){t.hidden=true;t.innerHTML='';return}t.hidden=false;t.innerHTML=`${ic('checkc')}<span>${esc(UI.toast.msg)}</span>${UI.toast.action?`<button data-act="${UI.toast.action.act}">${esc(UI.toast.action.label)}</button>`:''}`}
+
+/* ---------- demonstração guiada ---------- */
+const TOUR=[
+  {t:'Conheça o produto',role:null,route:'site',do:'Leia a proposta, o problema, como funciona e os planos.',see:'Como a solução é apresentada para um cliente, antes de qualquer cadastro.'},
+  {t:'Entre como marca',role:null,route:'login',login:'b',do:'Clique em Entrar. A conta de demonstração já está preenchida.',see:'Login simples, com o método de acesso identificado.'},
+  {t:'Guia da marca',role:'b',route:'b/brand/vitta/guia',do:'Veja o que a marca pode e o que não pode falar.',see:'O guia é a régua que a IA usa para dar a nota.'},
+  {t:'Critérios da IA',role:'b',route:'b/brand/vitta/criterios',do:'Mude um peso ou desligue um critério eliminatório.',see:'Cada critério tem um peso; o eliminatório bloqueia o envio.'},
+  {t:'Teste os critérios',role:'b',route:'b/brand/vitta/teste',do:'Compare como 3 vídeos seriam avaliados.',see:'A marca valida a nota antes de usar com creators.'},
+  {t:'Crie uma campanha',role:'b',route:'b/new',do:'Avance pelos 5 passos. Use "Importar briefing".',see:'O briefing vira critérios e um cartão curto para o creator.'},
+  {t:'O creator recebe o cartão',role:'c',route:'c/campaign/c1',do:'Leia o cartão da campanha no celular.',see:'O que precisa aparecer e o que não pode, num só lugar.'},
+  {t:'O creator checa o vídeo',role:'c',route:'c/check/c1',do:'Analise um vídeo com problemas, depois uma versão boa, e envie.',see:'Duas notas, o que ajustar e em qual segundo do vídeo.'},
+  {t:'A marca aprova',role:'b',route:'b/approvals',do:'Aprove um vídeo e toque em Desfazer no aviso.',see:'Só chega o que passou na checagem, ordenado por performance.'},
+  {t:'Resultados',role:'b',route:'b/results/antes',do:'Compare antes e depois e veja se a nota acerta o que vende.',see:'O ganho medido com os dados da própria marca.'},
+];
+function renderTour(){
+  const el=$('#tour');
+  if(!UI.tour){el.innerHTML=S.route==='site'?'':`<button class="tourbtn" data-act="tourOpen">${ic('target')}Demonstração guiada</button>`;return}
+  const i=UI.tour.i, s=TOUR[i];
+  el.innerHTML=`<section class="tour" aria-label="Demonstração guiada">
+    <div class="th"><div><span class="kicker">Demonstração guiada · ${i+1} de ${TOUR.length}</span></div><button class="iconbtn" style="width:30px;height:30px" data-act="tourClose" aria-label="Fechar demonstração">${ic('x','sm')}</button></div>
+    <div class="tb"><div class="tprog">${TOUR.map((_,j)=>`<i class="${j<=i?'on':''}"></i>`).join('')}</div>
+      <div class="tstep"><h3>${esc(s.t)}</h3><div class="obs">${ic('target')}<span><b style="color:var(--label)">Faça:</b> ${esc(s.do)}</span></div><div class="obs">${ic('eye')}<span><b style="color:var(--label)">Observe:</b> ${esc(s.see)}</span></div>
+        <button class="btn sm tinted" data-act="tourGo" data-i="${i}">${ic('arrow','sm')}Ir para esta tela</button></div>
+      <details><summary class="small muted" style="cursor:pointer">Ver todos os passos</summary><div class="tl2">${TOUR.map((x,j)=>`<button class="${j===i?'on':''}" data-act="tourGo" data-i="${j}"><b>${j+1}</b><span>${esc(x.t)}</span></button>`).join('')}</div></details></div>
+    <div class="tf"><button class="btn sm" data-act="tourStep" data-d="-1" ${i===0?'disabled':''}>Anterior</button><button class="btn sm primary" data-act="tourStep" data-d="1" ${i===TOUR.length-1?'disabled':''}>Próximo passo</button></div>
+  </section>`;
+}
+
+/* ---------- renderização principal ---------- */
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function trackProgress(){
+  const r=S.route;
+  if(/^b\/brand\/[^/]+\/teste$/.test(r)&&!S.progress.critTested){S.progress.critTested=true;save()}
+  if(r.startsWith('b/results')&&!S.progress.resultsViewed){S.progress.resultsViewed=true;save()}
+}
+function render(){
+  trackProgress();
+  const keep=$('#cscroll'), prevTop=keep?keep.scrollTop:0, sameRoute=UI.lastRoute===S.route;
+  const a=S.route.split('/')[0];
+  const html=a==='site'?vSite():a==='login'?vLogin():a==='onb'?vOnb(S.route.split('/')[1]):a==='b'?vBrandApp():a==='c'?vCreatorApp():vSite();
+  $('#app').innerHTML=html;
+  renderTour(); renderSheet(); renderToast();
+  const cs=$('#cscroll'); if(cs&&sameRoute&&!UI.scrollTo) cs.scrollTop=prevTop;
+  if(UI.scrollTo){const el=document.getElementById(UI.scrollTo);if(el) el.scrollIntoView({behavior:'smooth',block:'start'});UI.scrollTo=null}
+  UI.lastRoute=S.route;
+  document.title=pageTitle();
+}
+function pageTitle(){
+  const [a,p]=S.route.split('/');
+  const map={site:'Cérebro da Marca · vídeos aprovados de primeira',login:'Entrar · Cérebro da Marca',onb:'Bem-vindo · Cérebro da Marca'};
+  if(map[a]) return map[a];
+  const names={home:'Início',approvals:'Aprovações',campaigns:'Campanhas',campaign:'Campanha',new:'Nova campanha',brands:'Guias de marca',brand:'Guia da marca',results:'Resultados',check:'Checar vídeo',history:'Histórico',profile:'Perfil'};
+  return `${names[p]||'Início'} · Cérebro da Marca`;
+}
+function go(route,opts){S.route=route;if(opts&&opts.scroll)UI.scrollTo=opts.scroll;save();render();if(!opts||!opts.scroll)window.scrollTo(0,0)}
+function feed(x){S.feed.unshift({t:nowLabel(),x});S.feed=S.feed.slice(0,30)}
+
+/* ================================================================
+   Site comercial, login e introdução (onboarding)
+   ================================================================ */
+function logoHtml(act){return `<button class="logo" ${act?`data-act="${act}"`:''} aria-label="Cérebro da Marca, página inicial"><span class="mk">${ic('spark')}</span>Cérebro da Marca</button>`}
+function heroMock(){
+  return `<div class="mock" aria-hidden="true"><div class="dev">
+    <div class="row between"><span class="small muted">Vitta Energia · Volta às aulas</span><span class="chip warn">${ic('spark')}Checado</span></div>
+    <b style="font-size:1.12rem">Resultado da checagem</b>
+    <div class="verdict no">${ic('warn')}<span>Ajuste 2 pontos antes de enviar<small>A aderência já passou do mínimo da marca.</small></span></div>
+    <div class="rings2"><div class="rbox">${ring(82,'var(--green-fill)',76,'Aderência')}<span class="s">mínimo 75</span></div><div class="rbox">${ring(64,'var(--orange-fill)',76,'Performance')}<span class="s">orienta o creator</span></div></div>
+    <div><div class="fx"><span class="n pf">1</span><div class="t"><span class="ts">0:00</span> · Gancho nos 3 primeiros segundos<div class="how">${ic('check')}Comece com o produto na mão.</div></div></div>
+    <div class="fx"><span class="n">2</span><div class="t"><span class="ts">0:41</span> · Tom de voz<div class="how">${ic('check')}Fale sem exagero, do seu jeito.</div></div></div></div>
+    <button class="btn primary block" tabindex="-1">Subir nova versão</button></div>
+    <div class="float">${ic('checkc')}<div><div>Aprovado de primeira</div><div class="xs muted" style="font-weight:500">Pagamento liberado para a creator</div></div></div></div>`;
+}
+function vSite(){
+  return `<div class="site">
+  <header class="snav"><div class="in">${logoHtml('toTop')}
+    <nav aria-label="Seções"><button data-act="scrollTo" data-id="como">Como funciona</button><button data-act="scrollTo" data-id="publico">Para quem é</button><button data-act="scrollTo" data-id="validacao">Validação</button><button data-act="scrollTo" data-id="precos">Preços</button><button data-act="scrollTo" data-id="faq">Dúvidas</button></nav>
+    <button class="btn plain" data-act="toLogin" data-mode="entrar">Entrar</button><button class="btn primary sm" data-act="startDemo">Ver demonstração</button></div></header>
+
+  <section class="wrap hero">
+    <div><span class="pill">${ic('spark')}Marketing de influência com IA</span>
+      <h1>Vídeos de influenciadores aprovados de primeira.</h1>
+      <p class="sub">A IA confere cada vídeo com o guia da sua marca antes de ele chegar até você. O creator corrige sozinho, e sua equipe só aprova o que já está certo.</p>
+      <div class="ctas"><button class="btn primary lg" data-act="startDemo">Ver demonstração</button><button class="btn lg" data-act="scrollTo" data-id="como">Como funciona ${ic('right','sm')}</button></div>
+      <div class="micro"><span>${ic('checkc')}Creators usam grátis</span><span>${ic('checkc')}Teste sem cartão de crédito</span><span>${ic('checkc')}Reels, TikTok e Shorts</span></div></div>
+    ${heroMock()}
+  </section>
+
+  <section class="band" id="problema"><div class="wrap">
+    <div class="sect-h"><h2>O vai e volta que atrasa as suas campanhas</h2><p>Marcas e microinfluenciadores querem a mesma coisa: um vídeo que venda. Mas o caminho até a aprovação é lento.</p></div>
+    <div class="grid3">
+      <div class="feat"><span class="fi" style="background:var(--orange-fill)">${ic('msg')}</span><h3>O creator não entende a marca</h3><p class="muted">Briefings longos e confusos viram vídeos fora do tom, com falas que a marca não pode usar.</p></div>
+      <div class="feat"><span class="fi" style="background:var(--indigo-fill)">${ic('clock')}</span><h3>A revisão é manual e lenta</h3><p class="muted">Cada vídeo é conferido um por um. Um ciclo de ajustes leva cerca de uma semana.</p></div>
+      <div class="feat"><span class="fi" style="background:var(--red-fill)">${ic('xoct')}</span><h3>O erro vai ao ar</h3><p class="muted">Sem tempo para revisar, o vídeo é publicado do jeito errado, ou a campanha perde o momento.</p></div>
+    </div></div></section>
+
+  <section class="band alt" id="como"><div class="wrap">
+    <div class="sect-h"><h2>Como funciona</h2><p>Quatro passos, dos dois lados da parceria.</p></div>
+    <div class="steps4">
+      <div class="st4"><span class="n">1</span><span class="who">Marca ou agência</span><h3>Cadastre o guia da marca</h3><p class="muted small">Posicionamento, tom, o que pode e o que não pode. A IA transforma tudo em critérios com peso.</p></div>
+      <div class="st4"><span class="n">2</span><span class="who">Marca ou agência</span><h3>Crie a campanha</h3><p class="muted small">O briefing vira um cartão curto e claro para cada creator convidado.</p></div>
+      <div class="st4 core"><span class="n" style="background:var(--green-fill)">3</span><span class="who">Creator</span><h3>O creator checa o vídeo</h3><p class="muted small">Antes de enviar, recebe duas notas e a lista do que ajustar, no segundo exato.</p></div>
+      <div class="st4"><span class="n">4</span><span class="who">Marca ou agência</span><h3>Aprove só o que passou</h3><p class="muted small">Fila ordenada por potencial de performance. Aprovar libera o pagamento do creator.</p></div>
+    </div>
+    <p class="loopline">${ic('repeat')}A cada aprovação e ajuste, a IA aprende o que a sua marca quer.</p>
+  </div></section>
+
+  <section class="band" id="checagem"><div class="wrap core-sec">
+    ${heroMock()}
+    <div class="stack" style="gap:18px"><span class="kicker">O coração da solução</span><h2 style="font-size:clamp(1.8rem,3.2vw,2.4rem);letter-spacing:-.03em">Uma checagem que acaba com o vai e volta</h2>
+      <ul>
+        <li><span class="bx" style="background:var(--green-soft);color:var(--green)">${ic('shield')}</span><div><b>Aderência à marca</b><p class="muted small">Mede se o vídeo segue o guia e o briefing. Abaixo da nota mínima, o creator não consegue enviar.</p></div></li>
+        <li><span class="bx" style="background:var(--indigo-soft);color:var(--indigo)">${ic('bolt')}</span><div><b>Potencial de performance</b><p class="muted small">Orienta gancho, ritmo, duração e chamada para ação, para o vídeo vender mais.</p></div></li>
+        <li><span class="bx" style="background:var(--red-soft);color:var(--red)">${ic('xoct')}</span><div><b>O que não pode, não passa</b><p class="muted small">Promessas proibidas são critério eliminatório e bloqueiam o envio.</p></div></li>
+        <li><span class="bx" style="background:var(--accent-soft);color:var(--accent-text)">${ic('clock')}</span><div><b>O ajuste no segundo exato</b><p class="muted small">Cada ponto mostra onde está no vídeo e como corrigir, em linguagem simples.</p></div></li>
+      </ul></div></div></section>
+
+  <section class="band alt" id="publico"><div class="wrap">
+    <div class="sect-h"><h2>Feito para os dois lados</h2><p>A marca ganha controle sem travar o creator. O creator ganha clareza e recebe mais rápido.</p></div>
+    <div class="two-aud">
+      <div class="aud b"><span class="kicker">Para marcas e agências</span><h3 style="font-size:1.4rem">Menos retrabalho, mais campanhas no ar</h3>
+        <ul><li>${ic('check')}<span>Vídeos chegam dentro dos critérios da marca</span></li><li>${ic('check')}<span>Aprovação em lote, ordenada por performance</span></li><li>${ic('check')}<span>Regras de fala e de imagem que bloqueiam o que não pode ir ao ar</span></li><li>${ic('check')}<span>Métricas de antes e depois, e teste de performance antes de anunciar</span></li></ul>
+        <button class="btn primary" style="align-self:flex-start" data-act="demoAs" data-role="b">Ver a área da marca</button></div>
+      <div class="aud c"><span class="kicker" style="color:var(--green)">Para creators</span><h3 style="font-size:1.4rem">Clareza antes de gravar, pagamento mais rápido</h3>
+        <ul><li>${ic('check')}<span>Um cartão curto, no lugar do briefing longo</span></li><li>${ic('check')}<span>Saiba antes de enviar se o vídeo está certo</span></li><li>${ic('check')}<span>Aprovado, o pagamento é liberado</span></li><li>${ic('check')}<span>Grátis para sempre</span></li></ul>
+        <button class="btn good" style="align-self:flex-start" data-act="demoAs" data-role="c">Ver a área do creator</button></div>
+    </div></div></section>
+
+  <section class="band" id="validacao"><div class="wrap">
+    <div class="sect-h"><h2>Construído com quem vive o problema</h2><p>Antes de escrever uma linha de código, conversamos com 14 pessoas: 8 marcas, 1 agência e 5 creators.</p></div>
+    <div class="stats3">
+      <div class="stat"><b>86%</b><span>relatam desalinhamento entre o que a marca quer e o que o creator entrega</span></div>
+      <div class="stat"><b>9 de 9</b><span>empresas revisam os vídeos à mão, um por um, ou nem revisam</span></div>
+      <div class="stat"><b>30%</b><span>dos vídeos voltam para refação, com cerca de uma semana por ciclo</span></div>
+    </div>
+    <p class="small muted" style="text-align:center;margin-top:14px">Fonte: entrevistas do time, setembro de 2026.</p>
+    <div class="sect-h" style="margin-top:44px;margin-bottom:22px"><h2 style="font-size:1.7rem">O que esperamos no piloto</h2></div>
+    <div class="stats3">
+      <div class="stat"><b>30% → 10%</b><span>de vídeos devolvidos pela marca</span></div>
+      <div class="stat"><b>7 → 2 dias</b><span>do envio à aprovação</span></div>
+      <div class="stat"><b>−50%</b><span>de gasto com testes de anúncio, testando só os vídeos mais bem avaliados</span></div>
+    </div>
+    <p class="small muted" style="text-align:center;margin-top:14px">Metas do piloto, calculadas a partir das entrevistas.</p>
+  </div></section>
+
+  <section class="band alt" id="precos"><div class="wrap">
+    <div class="sect-h"><h2>Preços simples</h2><p>A marca paga pelo volume de vídeos checados. O creator não paga nada.</p></div>
+    <div class="prices">
+      <div class="price"><b>Creator</b><div class="amt">Grátis</div><ul><li>${ic('check')}<span>Cartões das campanhas</span></li><li>${ic('check')}<span>Checagens ilimitadas</span></li><li>${ic('check')}<span>Nota de entrega no perfil</span></li></ul><button class="btn" data-act="demoAs" data-role="c">Entrar como creator</button></div>
+      <div class="price"><b>Essencial</b><div class="amt">R$ 290<small>/mês</small></div><ul><li>${ic('check')}<span>Até 20 vídeos por mês</span></li><li>${ic('check')}<span>1 marca</span></li><li>${ic('check')}<span>Aprovação em lote</span></li></ul><button class="btn" data-act="toLogin" data-mode="criar">Começar</button></div>
+      <div class="price pop"><span class="tag">Mais escolhido</span><b>Pro</b><div class="amt">R$ 990<small>/mês</small></div><ul><li>${ic('check')}<span>Até 60 vídeos por mês</span></li><li>${ic('check')}<span>Várias campanhas</span></li><li>${ic('check')}<span>Resultados e teste de performance</span></li></ul><button class="btn primary" data-act="toLogin" data-mode="criar">Começar</button></div>
+      <div class="price"><b>Agência</b><div class="amt">R$ 1.990<small>/mês</small></div><ul><li>${ic('check')}<span>Até 200 vídeos por mês</span></li><li>${ic('check')}<span>Várias marcas</span></li><li>${ic('check')}<span>Guias e critérios por marca</span></li></ul><button class="btn" data-act="toLogin" data-mode="criar">Começar</button></div>
+    </div>
+    <p class="small muted" style="text-align:center;margin-top:14px">Preços de lançamento, em validação com as primeiras marcas.</p>
+  </div></section>
+
+  <section class="band" id="faq"><div class="wrap"><div class="sect-h"><h2>Dúvidas frequentes</h2></div><div class="faq">
+    <details><summary>A IA substitui a aprovação da minha equipe? ${ic('right')}</summary><p>Não. A IA confere o vídeo e aponta os ajustes. A decisão final continua com a marca, que pode aprovar, pedir ajuste ou transformar um pedido em regra nova.</p></details>
+    <details><summary>Como a IA sabe o que é certo para a minha marca? ${ic('right')}</summary><p>Ela usa o guia que você cadastra: posicionamento, tom, o que pode e o que não pode, regras visuais e itens obrigatórios. Você ajusta os pesos e testa com vídeos de exemplo antes de usar.</p></details>
+    <details><summary>O creator paga alguma coisa? ${ic('right')}</summary><p>Não. Creators usam grátis. Quem paga é a marca ou a agência, pelo volume de vídeos checados.</p></details>
+    <details><summary>E se a nota estiver errada? ${ic('right')}</summary><p>Cada nota mostra como foi calculada, critério por critério. Quando a marca pede um ajuste, pode transformar o pedido em regra, e a checagem passa a considerar isso para todos.</p></details>
+    <details><summary>Funciona para quais formatos? ${ic('right')}</summary><p>Vídeos verticais de Reels, TikTok e Shorts. A checagem olha a fala, as cenas e o texto na tela.</p></details>
+  </div></div></section>
+
+  <section class="wrap cta-final"><h2 style="font-size:clamp(1.8rem,3.4vw,2.6rem);letter-spacing:-.03em">Veja a plataforma funcionando</h2><p class="muted" style="font-size:1.1rem">A demonstração guiada mostra os dois lados em poucos minutos.</p><button class="btn primary lg" data-act="startDemo">Ver demonstração</button></section>
+  <footer class="sfoot"><div class="wrap row between"><span>Cérebro da Marca · protótipo do Startup Weekend Martech SP 2026</span><span>Marcas, creators e números da plataforma são fictícios.</span></div></footer>
+  </div>`;
+}
+
+function vLogin(){
+  const role=UI.loginRole||'b', mode=UI.authMode||'entrar';
+  const email=role==='b'?'agencia@example.com':'ana@example.com';
+  const title=mode==='entrar'?'Entrar':'Criar conta';
+  return `<div class="auth">
+    <aside class="side">${logoHtml()}
+      <div class="stack" style="gap:22px"><h2>Aprove vídeos de influenciadores sem o vai e volta.</h2>
+        <ul><li>${ic('shield')}<span>A IA confere cada vídeo com o guia da marca</span></li><li>${ic('wand')}<span>O creator corrige antes de enviar</span></li><li>${ic('inbox')}<span>Sua equipe aprova em lote o que já está certo</span></li></ul></div>
+      <p class="small" style="opacity:.85">Protótipo do Startup Weekend Martech SP 2026</p></aside>
+    <main class="main"><div class="form">
+      <button class="link row" style="gap:4px;align-self:flex-start" data-act="toSite">${ic('left','sm')}Voltar para o site</button>
+      <div><h1>${title}</h1><p class="muted" style="margin-top:6px">${mode==='entrar'?'Acesse com seu e-mail e senha.':'Crie sua conta com e-mail e senha. Leva menos de um minuto.'}</p></div>
+      <div class="card"><form class="stack" style="gap:14px" data-form="${mode==='entrar'?'login':'signup'}" novalidate>
+        <div class="field"><span id="lbl-role">Você é</span><div class="seg full" role="radiogroup" aria-labelledby="lbl-role"><button type="button" role="radio" aria-checked="${role==='b'}" class="${role==='b'?'on':''}" data-act="loginRole" data-role="b">Marca ou agência</button><button type="button" role="radio" aria-checked="${role==='c'}" class="${role==='c'?'on':''}" data-act="loginRole" data-role="c">Creator</button></div></div>
+        ${mode==='criar'?`<label class="field"><span>Nome</span><input class="inp" id="f-name" autocomplete="name" value="${role==='b'?'Agência Exemplo':'Ana Lima'}"></label>`:''}
+        <label class="field"><span>E-mail</span><input class="inp" id="f-email" type="email" autocomplete="email" value="${email}"></label>
+        <label class="field"><span>Senha</span><input class="inp" id="f-pass" type="password" autocomplete="${mode==='entrar'?'current-password':'new-password'}" value="demonstracao"></label>
+        ${UI.loginErr?`<p class="err" role="alert">${ic('warn','sm')}${esc(UI.loginErr)}</p>`:''}
+        <button class="btn primary lg block" type="submit">${mode==='entrar'?'Entrar':'Criar conta e começar'}</button>
+        ${mode==='entrar'?`<button type="button" class="link small" style="align-self:center" data-act="forgot">Esqueci minha senha</button>`:''}
+      </form></div>
+      <div class="demo-note">${ic('info')}<span>Conta de demonstração já preenchida. É só ${mode==='entrar'?'entrar':'criar a conta'}. Nada é enviado: os dados ficam neste navegador.</span></div>
+      <p class="small muted" style="text-align:center">${mode==='entrar'?`Não tem conta? <button class="link" data-act="authMode" data-mode="criar">Criar conta</button>`:`Já tem conta? <button class="link" data-act="authMode" data-mode="entrar">Entrar</button>`}</p>
+    </div></main></div>`;
+}
+
+const ONB={
+  b:[
+    {icon:'book',grad:'#0071E3,#5856D6',t:'Cadastre o guia da sua marca',x:'Posicionamento, tom, o que pode e o que não pode. A IA transforma tudo em critérios com peso, e você testa antes de usar.'},
+    {icon:'shield',grad:'#34C759,#0A9F6A',t:'O creator checa antes de enviar',x:'Cada vídeo recebe duas notas e a lista do que ajustar. Só chega até você o que passou da nota mínima.'},
+    {icon:'inbox',grad:'#FF9500,#FF2D55',t:'Aprove em lote e acompanhe o ganho',x:'A fila vem ordenada por potencial de performance. Aprovar libera o pagamento, e os resultados mostram o antes e o depois.'},
+  ],
+  c:[
+    {icon:'doc',grad:'#0071E3,#5856D6',t:'Receba o cartão da marca',x:'Tudo o que precisa aparecer e o que não pode, num só lugar. O resto é do seu jeito.'},
+    {icon:'spark',grad:'#34C759,#0A9F6A',t:'Cheque o vídeo antes de enviar',x:'A IA mostra o que ajustar e em qual segundo. Nada vai para a marca até você decidir.'},
+    {icon:'money',grad:'#FF9500,#FF2D55',t:'Envie e receba mais rápido',x:'Vídeo aprovado libera o pagamento. Sua nota de entrega ajuda a receber novos convites.'},
+  ],
+};
+function vOnb(role){
+  const i=UI.onbStep||0, s=ONB[role][i], lastStep=i===ONB[role].length-1;
+  return `<div class="onb"><section class="panel" aria-label="Introdução">
+    <div class="row between"><span class="small muted">${role==='b'?'Marca ou agência':'Creator'} · ${i+1} de ${ONB[role].length}</span><button class="link" data-act="onbDone" data-role="${role}">Pular</button></div>
+    <div class="art" style="background:linear-gradient(135deg,${s.grad})">${ic(s.icon)}</div>
+    <h2>${esc(s.t)}</h2><p class="muted" style="font-size:1.02rem">${esc(s.x)}</p>
+    <div class="dots" aria-hidden="true">${ONB[role].map((_,j)=>`<i class="${j===i?'on':''}"></i>`).join('')}</div>
+    <div class="row" style="justify-content:center">${i>0?`<button class="btn" data-act="onbStep" data-d="-1">Voltar</button>`:''}<button class="btn primary" data-act="${lastStep?'onbDone':'onbStep'}" data-d="1" data-role="${role}">${lastStep?'Começar':'Continuar'}</button></div>
+    <p class="xs faint">Você pode rever esta introdução a qualquer momento em Ajuda.</p>
+  </section></div>`;
+}
+
+/* ================================================================
+   Área da marca / agência (desktop)
+   ================================================================ */
+function vBrandApp(){
+  const [,p,id,tab]=S.route.split('/');
+  const C=(label,to)=>to?`<button data-act="nav" data-to="${to}">${esc(label)}</button>`:`<span aria-current="page" style="color:var(--label);font-weight:600">${esc(label)}</span>`;
+  let crumbs=[],body='',actions='';
+  switch(p){
+    case 'approvals':crumbs=[C('Aprovações')];body=vBApprovals();break;
+    case 'campaigns':crumbs=[C('Campanhas')];body=vBCampaigns();actions=`<button class="btn sm primary" data-act="newCampaign">${ic('plus','sm')}Nova campanha</button>`;break;
+    case 'campaign':{const c=camp(id);crumbs=[C('Campanhas','b/campaigns'),C(c?c.name:'Campanha')];body=vBCampaign(id,tab||'geral');break}
+    case 'new':crumbs=[C('Campanhas','b/campaigns'),C('Nova campanha')];body=vBNew();break;
+    case 'brands':crumbs=[C('Guias de marca')];body=vBBrands();actions=`<button class="btn sm primary" data-act="sheet" data-type="newBrand">${ic('plus','sm')}Adicionar marca</button>`;break;
+    case 'brand':{const b=brand(id);crumbs=[C('Guias de marca','b/brands'),C(b?b.name:'Marca')];body=vBBrand(id,tab||'guia');break}
+    case 'results':crumbs=[C('Resultados')];body=vBResults(id||'antes');break;
+    default:crumbs=[C('Início')];body=vBHome();
+  }
+  return `<div class="app"><aside class="sidebar" aria-label="Menu principal">${vSidebar(p)}</aside><div class="main">
+    <header class="topbar"><nav class="crumbs" aria-label="Você está em">${crumbs.join(ic('right'))}</nav><div class="row" style="gap:8px">${actions}<button class="btn sm" data-act="switchRole">${ic('phone','sm')}Ver como creator</button><button class="iconbtn" data-act="sheet" data-type="help" aria-label="Ajuda e glossário">${ic('help')}</button></div></header>
+    <main class="content" id="main">${body}</main></div></div>`;
+}
+function vSidebar(p){
+  const q=S.videos.filter(v=>v.status==='enviado').length;
+  const on=pg=>p===pg||(pg==='brands'&&p==='brand')||(pg==='campaigns'&&(p==='campaign'||p==='new'))||(pg==='home'&&(!p||p==='home'));
+  const it=(pg,label,icon,extra='')=>`<button class="nav ${on(pg)?'on':''}" data-act="nav" data-to="b/${pg}" ${on(pg)?'aria-current="page"':''}>${ic(icon)}<span>${label}</span>${extra}</button>`;
+  return `<div class="org"><span class="avatar" aria-hidden="true">AE</span><div><b>Agência Exemplo</b><div class="xs muted">Plano Agência · ${S.brands.length} marcas</div></div></div>
+    ${it('home','Início','home')}${it('approvals','Aprovações','inbox',q?`<span class="badge" aria-label="${q} para aprovar">${q}</span>`:'')}${it('campaigns','Campanhas','megaphone')}${it('brands','Guias de marca','book')}${it('results','Resultados','chart')}
+    <div class="side-sep"></div><span class="side-lbl">Ajuda</span>
+    <button class="nav" data-act="sheet" data-type="help">${ic('help')}<span>Ajuda e glossário</span></button>
+    <button class="nav" data-act="replayOnb" data-role="b">${ic('spark')}<span>Rever a introdução</span></button>
+    <div style="flex:1"></div><div class="sfoot2"><button class="nav" data-act="logout">${ic('logout')}<span>Sair</span></button></div>`;
+}
+
+/* ---------- Início ---------- */
+function checklist(){return [
+  {t:'Cadastrar o guia de uma marca',d:'O guia é a régua que a IA usa.',done:S.brands.some(b=>b.posicionamento),to:'b/brand/vitta/guia'},
+  {t:'Testar os critérios da IA',d:'Veja como 3 vídeos seriam avaliados.',done:S.progress.critTested,to:'b/brand/vitta/teste'},
+  {t:'Criar uma campanha',d:'O briefing vira o cartão do creator.',done:S.progress.createdCampaign,to:'b/new'},
+  {t:'Aprovar o primeiro vídeo',d:'Só chega o que passou na checagem.',done:S.progress.approvedOne,to:'b/approvals'},
+  {t:'Ver os resultados',d:'Antes e depois, com os seus dados.',done:S.progress.resultsViewed,to:'b/results/antes'},
+]}
+function vBHome(){
+  const m=metrics('all'), cl=checklist(), done=cl.filter(x=>x.done).length;
+  const crit=Object.entries(m.byCrit).sort((a,b)=>b[1]-a[1]).slice(0,5), cmax=crit.length?crit[0][1]:1;
+  const boost=S.videos.filter(v=>v.status==='aprovado').sort((a,b)=>last(b).perf-last(a).perf).slice(0,3);
+  const invites=S.campaigns.reduce((a,c)=>a+Object.values(c.invites).filter(x=>x==='convidado').length,0);
+  const att=[];
+  if(m.queue) att.push({i:'inbox',c:'var(--accent)',t:`${m.queue} ${m.queue===1?'vídeo espera':'vídeos esperam'} a sua aprovação`,d:'Todos já passaram na checagem do creator.',to:'b/approvals',tab:'fila'});
+  if(m.adjust) att.push({i:'undo',c:'var(--orange-fill)',t:`${m.adjust} ${m.adjust===1?'ajuste aguarda':'ajustes aguardam'} o creator`,d:'O creator recebe o seu comentário e envia uma nova versão.',to:'b/approvals',tab:'ajuste'});
+  if(invites) att.push({i:'users',c:'var(--indigo-fill)',t:`${invites} ${invites===1?'convite ainda não foi aceito':'convites ainda não foram aceitos'}`,d:'O creator vê o convite no celular.',to:'b/campaigns'});
+  const K=(k,label,v,before,better)=>`<div class="kpi"><div class="top"><span>${label}</span>${infoBtn(k,label)}</div><div class="v">${v}</div><div class="cmp"><span>${before}</span>${better===null?'':better?`<span class="chip good">${ic('trend')}Melhorou</span>`:`<span class="chip warn">${ic('warn')}Atenção</span>`}</div></div>`;
+  return `<div class="ptitle"><div><h1>Olá, Agência Exemplo</h1><p>Veja o que precisa da sua atenção e como estão as aprovações.</p></div><button class="btn primary" data-act="newCampaign">${ic('plus','sm')}Nova campanha</button></div>
+  ${tip('home','Comece pelos primeiros passos','Cada item leva você à tela certa. Eles mostram o caminho completo, do guia da marca ao resultado.')}
+  <div class="grid2">
+    <section class="card" aria-labelledby="h-ps"><div class="row between"><h3 id="h-ps">Primeiros passos</h3><span class="chip acc">${done} de ${cl.length}</span></div><div class="progress" role="progressbar" aria-valuenow="${done}" aria-valuemin="0" aria-valuemax="${cl.length}"><i style="width:${done/cl.length*100}%"></i></div>
+      <div class="check">${cl.map(x=>`<div class="ck ${x.done?'done':''}"><span class="dot">${x.done?ic('check'):''}</span><div><div class="t" style="font-weight:600">${esc(x.t)}</div><div class="xs muted">${esc(x.d)}</div></div>${x.done?`<span class="xs muted">Feito</span>`:`<button class="btn sm tinted" data-act="${x.to==='b/new'?'newCampaign':'nav'}" data-to="${x.to}">Fazer</button>`}</div>`).join('')}</div></section>
+    <section class="card" aria-labelledby="h-att"><h3 id="h-att">Precisa da sua atenção</h3>
+      ${att.length?`<div class="group" style="box-shadow:none;background:var(--surface-2)">${att.map(a=>`<button class="gi" data-act="nav" data-to="${a.to}" ${a.tab?`data-tab="${a.tab}"`:''}><span class="gic" style="background:${a.c}">${ic(a.i,'sm')}</span><span class="gt"><b>${esc(a.t)}</b><span class="xs muted">${esc(a.d)}</span></span>${ic('right','sm')}</button>`).join('')}</div>`:`<div class="empty" style="padding:20px">${ic('checkc')}<b>Tudo em dia</b><span class="small muted">Nenhuma pendência agora.</span></div>`}</section>
+  </div>
+  <section class="stack" aria-labelledby="h-kpi"><div class="sechead"><h2 id="h-kpi">Como estão as aprovações</h2><span class="small muted">Comparado com o que ouvimos nas entrevistas</span></div>
+    <div class="grid4">
+      ${K('primeira','Aprovados de primeira',m.first===null?'—':pct(m.first),'Antes: 70%',m.first===null?null:m.first>.7)}
+      ${K('rodadas','Rodadas quando devolvido',m.rounds===null?'—':dec(m.rounds),'Antes: cerca de 2',m.rounds===null?null:m.rounds<2)}
+      ${K('tempo','Tempo até aprovar',m.days===null?'—':dec(m.days)+' dias','Antes: cerca de 7 dias',m.days===null?null:m.days<7)}
+      ${K('corrigidos','Problemas corrigidos antes de chegar',String(m.caught),`Em ${m.checks} checagens dos creators`,null)}
+    </div></section>
+  <div class="grid2">
+    <section class="card"><h3>${ic('warn')} Problemas mais comuns na checagem</h3><p class="small muted">Mostra onde o guia ou o briefing não está claro. Reforce esses pontos no cartão da marca.</p>
+      <div class="stack" style="gap:9px">${crit.map(([l,n])=>`<div class="hb"><span>${esc(l)}</span><div class="track"><i class="warn" style="width:${n/cmax*100}%"></i></div><span class="v">${n}</span></div>`).join('')}</div></section>
+    <section class="card"><h3>${ic('bolt')} Prontos para impulsionar</h3><p class="small muted">Vídeos aprovados com a maior nota de performance, bons candidatos a anúncio.</p>
+      ${boost.length?`<div class="group" style="box-shadow:none;background:var(--surface-2)">${boost.map(v=>{const c=camp(v.campaignId),x=last(v);return `<div class="gi noicon"><span class="gt"><b>${esc(cr(v.creatorId).name)}</b><span class="xs muted">${esc(brand(c.brandId).name)} · ${esc(c.name)}</span></span><span class="chip ind">${ic('bolt')}${x.perf}</span>${v.boosted?`<span class="chip good">${ic('check')}Em anúncio</span>`:`<button class="btn sm" data-act="boost" data-id="${v.id}">Impulsionar</button>`}</div>`}).join('')}</div>`:'<p class="small muted">Nenhum vídeo aprovado ainda.</p>'}</section>
+  </div>
+  <section class="card"><h3>${ic('clock')} Atividade recente</h3><div class="feed">${S.feed.slice(0,6).map(e=>`<div><span class="t">${esc(e.t)}</span><span>${esc(e.x)}</span></div>`).join('')}</div></section>`;
+}
+
+/* ---------- Aprovações ---------- */
+function qRow(v){
+  const c=camp(v.campaignId), x=last(v), fixed=v.versions.slice(0,-1).reduce((a,y)=>a+y.findings.length+(y.minor||0),0), who=cr(v.creatorId);
+  return `<article class="card" aria-label="Vídeo de ${esc(who.name)}"><div class="qrow">${thumb(v)}
+    <div class="stack" style="gap:7px"><div><b style="font-size:1.02rem">${esc(who.name)}</b> <span class="muted small">${esc(who.handle)}</span><div class="small muted">${esc(brand(c.brandId).name)} · ${esc(c.name)}${v.roundsBrand?` · ${v.roundsBrand+1}ª rodada`:''}</div></div>
+      <div class="row" style="gap:6px"><span class="chip good">${ic('shield')}Aderência ${x.ader}</span><span class="chip ind">${ic('bolt')}Performance ${x.perf}</span><span class="chip">${ic('repeat')}Checado ${v.versions.length}×</span>${fixed?`<span class="chip good">${ic('wand')}${fixed} ajustes feitos pelo creator</span>`:''}</div>
+      ${x.findings.length?`<p class="small muted">Pontos restantes: ${x.findings.slice(0,2).map(f=>esc(f.label)).join(' · ')}</p>`:`<p class="small row" style="gap:5px;color:var(--green)">${ic('checkc','sm')}Nenhum ponto pendente</p>`}</div>
+    <div class="acts"><button class="btn sm" data-act="sheet" data-type="analysis" data-id="${v.id}">Ver análise</button><button class="btn sm warn" data-act="sheet" data-type="adjust" data-id="${v.id}">Pedir ajuste</button><button class="btn sm good" data-act="approve" data-id="${v.id}">${ic('check','sm')}Aprovar</button></div></div></article>`;
+}
+function vBApprovals(){
+  const f=UI.apprCamp||'all', inC=v=>f==='all'||v.campaignId===f;
+  const q=S.videos.filter(v=>v.status==='enviado'&&inC(v)).sort((a,b)=>last(b).perf-last(a).perf);
+  const adj=S.videos.filter(v=>v.status==='ajuste'&&inC(v)), ok=S.videos.filter(v=>v.status==='aprovado'&&inC(v));
+  const tab=UI.apprTab||'fila', hi=q.filter(v=>last(v).ader>=85);
+  const T=(k,l,n)=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?'on':''}" data-act="apprTab" data-tab="${k}">${l} (${n})</button>`;
+  let list='';
+  if(tab==='fila') list=q.length?q.map(qRow).join(''):empty('checkc','Tudo em dia','Quando um creator enviar um vídeo que passou na checagem, ele aparece aqui, já ordenado por potencial de performance.',`<button class="btn tinted" data-act="nav" data-to="b/campaigns">Ver campanhas</button>`);
+  if(tab==='ajuste') list=adj.length?adj.map(v=>{const c=camp(v.campaignId);return `<article class="card"><div class="qrow">${thumb(v)}<div class="stack" style="gap:6px"><div><b>${esc(cr(v.creatorId).name)}</b><div class="small muted">${esc(brand(c.brandId).name)} · ${esc(c.name)}</div></div><p class="small"><b>Seu pedido:</b> "${esc(v.note)}"</p><span class="chip warn" style="align-self:flex-start">${ic('clock')}Aguardando nova versão do creator</span></div><div class="acts"><button class="btn sm" data-act="sheet" data-type="analysis" data-id="${v.id}">Ver análise</button></div></div></article>`}).join(''):empty('msg','Nenhum ajuste pendente','Quando você pedir um ajuste, o vídeo fica aqui até o creator enviar uma nova versão.');
+  if(tab==='ok') list=ok.length?`<div class="tw"><table><thead><tr><th>Creator</th><th>Campanha</th><th>Aderência</th><th>Performance</th><th>De primeira?</th><th>Tempo</th></tr></thead><tbody>${ok.map(v=>{const c=camp(v.campaignId),x=last(v);return `<tr><td><b>${esc(cr(v.creatorId).name)}</b></td><td class="small">${esc(brand(c.brandId).name)} · ${esc(c.name)}</td><td class="num">${x.ader}</td><td class="num">${x.perf}</td><td>${v.roundsBrand===0?`<span class="chip good">${ic('check')}Sim</span>`:`<span class="chip warn">${v.roundsBrand} ajuste</span>`}</td><td class="num">${dec(v.days)} dias</td></tr>`}).join('')}</tbody></table></div>`:empty('inbox','Nenhum vídeo aprovado','Os vídeos aprovados aparecem aqui, com o tempo até a aprovação.');
+  return `<div class="ptitle"><div><h1>Aprovações</h1><p>Só chega aqui o vídeo que passou da nota mínima na checagem do creator. Aprovar libera o pagamento.</p></div></div>
+  ${tip('appr','Aprovou por engano?','Depois de aprovar ou pedir ajuste, aparece um aviso com o botão Desfazer por alguns segundos.')}
+  <div class="row between"><div class="seg" role="tablist" aria-label="Filtrar vídeos">${T('fila','Para aprovar',q.length)}${T('ajuste','Ajuste pedido',adj.length)}${T('ok','Aprovados',ok.length)}</div>
+    <div class="row"><label class="sr" for="apprCamp">Campanha</label><select class="inp" id="apprCamp" style="width:auto;min-height:36px" data-field="apprCamp"><option value="all">Todas as campanhas</option>${S.campaigns.map(c=>`<option value="${c.id}" ${f===c.id?'selected':''}>${esc(brand(c.brandId).name)} · ${esc(c.name)}</option>`).join('')}</select>
+    ${tab==='fila'?`<button class="btn good" data-act="sheet" data-type="batch" ${hi.length?'':'disabled'} title="${hi.length?'':'Nenhum vídeo com aderência 85 ou mais na fila'}">${ic('check','sm')}Aprovar ${hi.length} com aderência 85+</button>`:''}</div></div>
+  ${tab==='fila'&&!hi.length&&q.length?`<p class="small muted">A aprovação em lote aparece quando há vídeos com aderência 85 ou mais.</p>`:''}
+  <div class="stack">${list}</div>`;
+}
+
+/* ---------- Campanhas ---------- */
+function vBCampaigns(){
+  return `<div class="ptitle"><div><h1>Campanhas</h1><p>Cada campanha tem um briefing, critérios e creators convidados. O creator recebe tudo num cartão curto.</p></div></div>
+  <div class="tw"><table><thead><tr><th>Campanha</th><th>Creators</th><th>Andamento</th><th>Fila</th><th>Prazo</th></tr></thead><tbody>
+  ${S.campaigns.map(c=>{const vs=S.videos.filter(v=>v.campaignId===c.id),inv=Object.keys(c.invites).length,ap=vs.filter(v=>v.status==='aprovado').length,q=vs.filter(v=>v.status==='enviado').length;
+    return `<tr class="click" data-act="nav" data-to="b/campaign/${c.id}"><td><button class="link" data-act="nav" data-to="b/campaign/${c.id}">${esc(c.name)}</button><div class="xs muted">${esc(brand(c.brandId).name)} · ${esc(c.objetivo)}</div></td><td class="num">${inv}</td><td style="min-width:180px"><div class="track"><i class="good" style="width:${inv?ap/inv*100:0}%"></i></div><div class="xs muted" style="margin-top:4px">${ap} de ${inv} aprovados</div></td><td>${q?`<span class="chip acc">${ic('inbox')}${q} na fila</span>`:'<span class="xs muted">Nenhum</span>'}</td><td>${esc(c.prazo)}</td></tr>`}).join('')}
+  </tbody></table></div>`;
+}
+function vCard(c){
+  const b=brand(c.brandId), pf=c.perf.slice().sort((x,y)=>y.weight-x.weight).slice(0,3);
+  const sec=(i,col,t,items)=>`<div class="bsec"><span class="bi" style="background:${col}">${ic(i,'sm')}</span><div><h4>${t}</h4><ul>${items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`;
+  return `<article class="bcard" aria-label="Cartão da campanha ${esc(c.name)}"><div class="hd"><span class="eyebrow">${esc(b.name)} · cartão da campanha</span><b style="font-size:1.15rem">${esc(c.name)}</b><span class="small" style="opacity:.9">${esc(c.mensagem)}</span></div><div class="bd">
+    ${sec('checkc','var(--green-fill)','Precisa aparecer',[...b.obrigatorios,(c.cta||'')+(c.cupom&&c.cupom!=='—'?` · cupom ${c.cupom}`:'')].filter(Boolean))}
+    ${sec('msg','var(--accent)','Pode e deve falar',b.podeFalar)}
+    ${sec('xoct','var(--red-fill)','Não pode falar',b.naoPode)}
+    ${sec('eye','var(--indigo-fill)','Regras visuais',b.visual)}
+    ${sec('bolt','var(--orange-fill)','Para performar',[...pf.map(x=>x.checks[0]),`Duração ideal: ${c.duracao}`])}
+    ${c.ganchos?`<div class="bsec"><span class="bi" style="background:#8E8E93">${ic('spark','sm')}</span><div><h4>Ideias de gancho</h4><p class="small" style="white-space:pre-line">${esc(c.ganchos)}</p></div></div>`:''}
+    <div class="bsec" style="grid-template-columns:1fr"><p class="small muted">O resto é com você: fale do seu jeito. Nota mínima para enviar: <b style="color:var(--label)">${c.minScore}</b>.</p></div></div></article>`;
+}
+function vBCampaign(id,tab){
+  const c=camp(id); if(!c) return empty('megaphone','Campanha não encontrada','Ela pode ter sido apagada ao recomeçar a demonstração.',`<button class="btn tinted" data-act="nav" data-to="b/campaigns">Ver campanhas</button>`);
+  const b=brand(c.brandId), vs=S.videos.filter(v=>v.campaignId===c.id), inv=Object.keys(c.invites).length;
+  const sent=vs.filter(v=>SENT.includes(v.status)).length, ap=vs.filter(v=>v.status==='aprovado').length, q=vs.filter(v=>v.status==='enviado').length;
+  const T=(k,l)=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?'on':''}" data-act="nav" data-to="b/campaign/${c.id}/${k}">${l}</button>`;
+  let body='';
+  if(tab==='geral') body=`<div class="grid4">${[['users','Creators convidados',inv],['video','Vídeos enviados',sent],['checkc','Aprovados',ap],['inbox','Na fila',q]].map(([i,l,n])=>`<div class="kpi"><div class="top"><span>${l}</span>${ic(i)}</div><div class="v">${n}</div></div>`).join('')}</div>
+    <div class="grid2"><section class="card"><h3>${ic('doc')} Briefing</h3><div class="group" style="box-shadow:none;background:var(--surface-2)">${[['Objetivo',c.objetivo],['Mensagem',c.mensagem],['Chamada',c.cta],['Cupom',c.cupom],['Formato',`${c.formato} · ${c.duracao}`],['Prazo',c.prazo],['Pagamento',`${brl(c.pagamento)} por vídeo, liberado na aprovação`]].map(([k,v])=>`<div class="gi noicon"><span class="gt"><span class="xs muted">${k}</span><b style="font-weight:500">${esc(v)}</b></span></div>`).join('')}</div></section>
+    <section class="card"><h3>${ic('chart')} Resultados dos anúncios</h3><p class="small muted">Traga views, CTR e vendas dos vídeos aprovados. Os números alimentam a aba Resultados e ensinam a nota de performance.</p>${S.results[c.id]?`<p class="row small" style="color:var(--green);gap:6px">${ic('checkc','sm')}Resultados importados.</p><button class="btn tinted" data-act="nav" data-to="b/results/nota">Ver em Resultados</button>`:`<button class="btn tinted" data-act="importResults" data-id="${c.id}">${ic('upload','sm')}Importar resultados (simulado)</button>`}</section></div>`;
+  if(tab==='cartao') body=`${why('Este é o cartão que cada creator recebe no celular, no lugar de um briefing longo. Ele junta o guia da marca e o briefing da campanha.')}<div style="max-width:440px">${vCard(c)}</div>`;
+  if(tab==='criterios') body=`${why(`Os critérios vêm do guia de ${esc(b.name)} e do briefing desta campanha. Para mudar as regras da marca, edite o guia.`)}<section class="card"><h3>Aderência</h3><div class="stack" style="gap:9px">${c.criteria.map(x=>`<div class="hb"><span>${esc(x.label)} ${x.elim?`<span class="chip bad">${ic('xoct')}Eliminatório</span>`:''}</span><div class="track"><i style="width:${x.weight/40*100}%"></i></div><span class="v">${x.weight}</span></div>`).join('')}</div></section><section class="card"><h3>Performance</h3><div class="stack" style="gap:9px">${c.perf.map(x=>`<div class="hb"><span>${esc(x.label)}</span><div class="track"><i class="ind" style="width:${x.weight/40*100}%"></i></div><span class="v">${x.weight}</span></div>`).join('')}</div></section>`;
+  if(tab==='creators') body=`<div class="tw"><table><thead><tr><th>Creator</th><th>Convite</th><th>Checagens</th><th>Aderência</th><th>Performance</th><th>Status</th></tr></thead><tbody>${Object.entries(c.invites).map(([cid,st])=>{const v=vs.find(x=>x.creatorId===cid),x=v&&last(v);return `<tr><td><b>${esc(cr(cid).name)}</b><div class="xs muted">${esc(cr(cid).handle)}</div></td><td>${st==='aceito'?`<span class="chip good">${ic('check')}Aceito</span>`:`<span class="chip">${ic('clock')}Convidado</span>`}</td><td class="num">${v?v.versions.length:0}</td><td class="num">${x?x.ader:'—'}</td><td class="num">${x?x.perf:'—'}</td><td>${vStatus(v)}</td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="ptitle"><div><span class="kicker">${esc(b.name)}</span><h1>${esc(c.name)}</h1><p>${esc(c.objetivo)} · prazo ${esc(c.prazo)} · criada em ${esc(c.created||'hoje')}</p></div></div>
+    <div class="seg" role="tablist" aria-label="Seções da campanha">${T('geral','Visão geral')}${T('cartao','Cartão do creator')}${T('criterios','Critérios')}${T('creators','Creators')}</div>${body}`;
+}
+
+/* ---------- Nova campanha (5 passos) ---------- */
+const WSTEPS=['Marca e nome','Briefing','Critérios','Creators','Revisar e publicar'];
+const WHY=['O guia da marca escolhida vira a base dos critérios. Você não precisa repetir as regras em cada campanha.','A mensagem e a chamada viram critérios da nota. Quanto mais clara a mensagem, mais o creator acerta de primeira.','Os pesos definem o que mais importa nesta campanha. Um critério eliminatório bloqueia o envio se falhar.','A nota de entrega mostra quem costuma acertar de primeira em outras campanhas.','Ao publicar, cada creator convidado recebe o convite e este cartão no celular.'];
+function newWizard(){const b=S.brands[0];UI.wizard={step:1,brandId:b.id,name:'',objetivo:'Vendas com cupom',mensagem:'',cta:'',cupom:'',formato:'Reels e TikTok',duracao:'60 a 90 s',prazo:'',pagamento:600,ganchos:'',criteria:null,perf:null,minScore:b.minScore,creators:['ana','carla','julia'],critFor:null};UI.wizErr=null}
+function wzEnsureCrit(){const w=UI.wizard,b=brand(w.brandId);
+  if(!w.criteria||w.critFor!==w.brandId){w.criteria=campCriteria(b,w);w.perf=JSON.parse(JSON.stringify(S.perf));w.minScore=b.minScore;w.critFor=w.brandId}
+  else{const m=w.criteria.find(c=>c.id==='camp_msg');if(m)m.checks=[w.mensagem||'—'];const k=w.criteria.find(c=>c.id==='camp_cta');if(k)k.checks=[w.cta||'—',w.cupom?`Cupom ${w.cupom}`:'Sem cupom']}}
+function vBNew(){
+  if(!UI.wizard) newWizard();
+  const w=UI.wizard, b=brand(w.brandId);
+  const F=(k,l,ph,type='text',h='')=>`<label class="field"><span>${l}${h?` <span class="hint">· ${h}</span>`:''}</span><input class="inp" type="${type}" value="${esc(w[k])}" placeholder="${esc(ph||'')}" data-field="wz" data-key="${k}"></label>`;
+  let body='';
+  if(w.step===1) body=`<div class="grid2"><label class="field"><span>Marca</span><select class="inp" data-field="wz" data-key="brandId">${S.brands.map(x=>`<option value="${x.id}" ${x.id===w.brandId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>${F('name','Nome da campanha','Ex.: Treino de manhã')}</div>
+    <div class="card flat" style="gap:4px"><span class="small muted">Guia usado nesta campanha</span><b>${esc(b.name)}</b><span class="small muted">${b.criteria.length} critérios · nota mínima ${b.minScore} · ${b.naoPode.length} proibições</span><button class="link small" style="align-self:flex-start" data-act="nav" data-to="b/brand/${b.id}/guia">Ver o guia</button></div>`;
+  if(w.step===2) body=`<div class="row between"><span class="small muted">Tem o briefing em PDF? A IA lê e preenche os campos.</span><button class="btn sm tinted" data-act="fillBrief">${ic('doc','sm')}Importar briefing (simulado)</button></div>
+    <div class="grid2"><label class="field"><span>Objetivo</span><select class="inp" data-field="wz" data-key="objetivo">${['Vendas com cupom','Lançamento','Reconhecimento de marca'].map(o=>`<option ${o===w.objetivo?'selected':''}>${o}</option>`).join('')}</select></label>
+    ${F('mensagem','Mensagem principal','Ex.: Energia sem cafeína para a rotina de estudos','text','vira critério da nota')}${F('cta','Chamada para ação','Ex.: Use o cupom no link da bio')}${F('cupom','Cupom ou link','Ex.: VITTA15')}${F('formato','Formato','Reels e TikTok')}${F('duracao','Duração ideal','60 a 90 s')}${F('prazo','Prazo de entrega','Ex.: 30/10')}${F('pagamento','Pagamento por vídeo (R$)','600','number','liberado na aprovação')}</div>
+    <label class="field"><span>Ideias de gancho <span class="hint">· opcional, uma por linha</span></span><textarea class="inp" data-field="wz" data-key="ganchos">${esc(w.ganchos)}</textarea></label>`;
+  if(w.step===3){wzEnsureCrit();body=`<div class="crit-h"><span>Critério de aderência</span><span>O que a IA verifica</span><span>Peso</span><span>Eliminatório</span></div>${critRows(w.criteria,'wizard','',true)}
+    <h3 style="margin-top:8px">Performance</h3>${critRows(w.perf,'wperf','',false)}
+    <div class="field" style="max-width:420px"><span>Nota mínima para enviar ${infoBtn('minima')}</span><div class="row"><input type="range" min="50" max="95" step="5" value="${w.minScore}" data-field="minScore" data-scope="wizard" aria-label="Nota mínima"><output class="num" style="font-weight:700;font-size:1.2rem">${w.minScore}</output></div></div>`}
+  if(w.step===4) body=`<div class="tw"><table><thead><tr><th><span class="sr">Convidar</span></th><th>Creator</th><th>Seguidores</th><th>Nota de entrega ${infoBtn('entrega')}</th><th>De primeira</th><th>Entregas</th></tr></thead><tbody>
+    ${CREATORS.map(c=>`<tr><td><input type="checkbox" style="width:20px;height:20px" ${w.creators.includes(c.id)?'checked':''} data-field="wzCreator" data-id="${c.id}" aria-label="Convidar ${esc(c.name)}"></td><td><b>${esc(c.name)}</b><div class="xs muted">${esc(c.handle)}</div></td><td>${c.fol}</td><td><span class="chip ${c.nota>=85?'good':c.nota>=75?'acc':'warn'}">${c.nota}</span></td><td class="num">${pct(c.primeira)}</td><td class="num">${c.entregas}</td></tr>`).join('')}</tbody></table></div>`;
+  if(w.step===5){wzEnsureCrit();const pre={...w,name:w.name||'Nova campanha',cupom:w.cupom||'—'};body=`<div class="grid2"><div class="stack"><div class="group">${[['Marca',b.name],['Campanha',w.name||'—'],['Mensagem',w.mensagem||'—'],['Chamada',(w.cta||'—')+(w.cupom?' · '+w.cupom:'')],['Creators convidados',w.creators.map(id=>cr(id).name).join(', ')||'Nenhum'],['Critérios',`${w.criteria.length} de aderência, ${w.perf.length} de performance · mínimo ${w.minScore}`]].map(([k,v])=>`<div class="gi noicon"><span class="gt"><span class="xs muted">${k}</span><b style="font-weight:500">${esc(v)}</b></span></div>`).join('')}</div>
+    ${w.creators.includes('ana')?`<div class="demo-note">${ic('info')}<span>A Ana Lima está convidada. Depois de publicar, use "Ver como creator" para ver o convite chegar.</span></div>`:''}</div><div class="stack"><span class="small muted">Prévia do cartão que o creator recebe</span>${vCard(pre)}</div></div>`}
+  return `<div class="ptitle"><div><h1>Nova campanha</h1><p>Cinco passos rápidos. Você pode voltar a qualquer passo já feito.</p></div></div>
+  <div class="wiz"><nav class="vsteps" aria-label="Passos">${WSTEPS.map((s,i)=>`<button class="vs ${i+1===w.step?'on':i+1<w.step?'done':''}" data-act="wzGo" data-i="${i+1}" ${i+1>w.step?'disabled':''} ${i+1===w.step?'aria-current="step"':''}><span class="n">${i+1<w.step?ic('check','sm'):i+1}</span><span>${s}</span></button>`).join('')}</nav>
+  <section class="card" aria-labelledby="h-step"><div><span class="kicker">Passo ${w.step} de 5</span><h2 id="h-step">${WSTEPS[w.step-1]}</h2></div>${why(WHY[w.step-1])}${body}
+    ${UI.wizErr?`<p class="err" role="alert">${ic('warn','sm')}${esc(UI.wizErr)}</p>`:''}
+    <div class="row between" style="margin-top:6px;border-top:1px solid var(--sep-2);padding-top:14px"><button class="btn" data-act="wzPrev" ${w.step===1?'disabled':''}>Voltar</button>${w.step<5?`<button class="btn primary" data-act="wzNext">Continuar</button>`:`<button class="btn good" data-act="wzPublish">${ic('check','sm')}Publicar e convidar ${w.creators.length} creators</button>`}</div></section></div>`;
+}
+
+/* ---------- Guias de marca ---------- */
+function vBBrands(){
+  return `<div class="ptitle"><div><h1>Guias de marca</h1><p>O guia de cada marca vira os critérios que a IA usa para dar a nota. Cadastre uma vez e use em todas as campanhas.</p></div></div>
+  ${tip('brands','O guia é a régua da IA','Quanto mais claro o guia, mais precisa a nota. Comece pelo que não pode ser dito: vira critério eliminatório.')}
+  <div class="grid3">${S.brands.map(b=>`<article class="card"><div class="row"><span class="avatar" style="background:hsl(${b.hue||210} 60% 48%)">${esc(b.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</span><div><h3>${esc(b.name)}</h3><span class="xs muted">${esc(b.seg||'')}</span></div></div>
+    <p class="small muted">${esc(b.posicionamento||'Guia ainda não cadastrado.')}</p>
+    <div class="row" style="gap:6px"><span class="chip acc">${b.criteria.length} critérios</span><span class="chip bad">${ic('xoct')}${b.naoPode.length} proibições</span><span class="chip">mínimo ${b.minScore}</span></div>
+    <div class="row between"><span class="xs muted">${S.campaigns.filter(c=>c.brandId===b.id).length} campanhas</span><button class="btn sm primary" data-act="nav" data-to="b/brand/${b.id}/guia">Abrir guia</button></div></article>`).join('')}</div>`;
+}
+function critRows(list,scope,id,withElim){
+  const tot=list.reduce((a,c)=>a+Number(c.weight||0),0)||1;
+  return list.map((c,i)=>`<div class="crit"><div><b>${esc(c.label)}</b>${c.custom?' <span class="chip">criado por você</span>':''}<div class="xs muted">${Math.round(Number(c.weight||0)/tot*100)}% da nota</div></div>
+    <div class="small muted">${(c.checks||[]).slice(0,3).map(esc).join('<br>')||'—'}</div>
+    <div class="w"><input type="range" min="0" max="40" step="5" value="${c.weight}" data-field="w" data-scope="${scope}" data-id="${id}" data-i="${i}" aria-label="Peso de ${esc(c.label)}"><output>${c.weight}</output></div>
+    <div class="el">${withElim?`<label class="switch"><input type="checkbox" ${c.elim?'checked':''} data-field="elim" data-scope="${scope}" data-id="${id}" data-i="${i}" aria-label="${esc(c.label)} bloqueia o envio se falhar"><span></span></label><span>${c.elim?'Bloqueia':'Não'}</span>${c.custom?`<button class="iconbtn" style="width:30px;height:30px" data-act="rmCrit" data-scope="${scope}" data-id="${id}" data-i="${i}" aria-label="Remover critério ${esc(c.label)}">${ic('x','sm')}</button>`:''}`:`<span class="xs faint">Não bloqueia</span>`}</div></div>`).join('');
+}
+function listCard(b,key,title,cls,icon,hint){
+  return `<section class="card"><div class="row between"><h3 class="row" style="gap:8px">${ic(icon)}${title}</h3>${hint?`<span class="xs muted">${hint}</span>`:''}</div>
+    <div class="items">${b[key].map((x,i)=>`<span class="item ${cls}">${ic(icon)}${esc(x)}<button data-act="rmItem" data-list="${key}" data-i="${i}" aria-label="Remover: ${esc(x)}">${ic('x','sm')}</button></span>`).join('')||'<span class="small muted">Nada cadastrado ainda.</span>'}</div>
+    <div class="row"><label class="sr" for="add-${key}">Adicionar em ${title}</label><input class="inp" id="add-${key}" style="flex:1;min-width:180px" placeholder="Adicionar…" data-enter="addItem" data-list="${key}"><button class="btn sm" data-act="addItem" data-list="${key}">${ic('plus','sm')}Adicionar</button></div></section>`;
+}
+function vBBrand(id,tab){
+  const b=brand(id); if(!b) return empty('book','Marca não encontrada','Ela pode ter sido apagada ao recomeçar a demonstração.');
+  const T=(k,l)=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?'on':''}" data-act="nav" data-to="b/brand/${b.id}/${k}">${l}</button>`;
+  let body='';
+  if(tab==='guia'){
+    const imp=UI.importing&&UI.importing.id===b.id?UI.importing:null;
+    body=`${tip('guia','Comece pelo que não pode','Tudo o que você colocar em "Não pode falar" vira um critério eliminatório: o creator não consegue enviar se falhar.')}
+    <div class="grid2"><section class="card"><h3 class="row" style="gap:8px">${ic('target')}Quem é a marca</h3>
+      <label class="field"><span>Posicionamento</span><textarea class="inp" data-field="bf" data-key="posicionamento">${esc(b.posicionamento)}</textarea></label>
+      <label class="field"><span>Público</span><input class="inp" value="${esc(b.publico)}" data-field="bf" data-key="publico"></label>
+      <label class="field"><span>Tom de voz</span><input class="inp" value="${esc(b.tom)}" data-field="bf" data-key="tom"></label></section>
+    <section class="card"><h3 class="row" style="gap:8px">${ic('doc')}Importar o guia em PDF</h3><p class="small muted">Suba o manual da marca. A IA lê e preenche as regras. Nesta demonstração, a leitura é simulada.</p>
+      ${imp?`<div class="stack" style="gap:6px"><span class="small">Lendo o guia… ${imp.p}%</span><div class="progress" role="progressbar" aria-valuenow="${imp.p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${imp.p}%"></i></div></div>`:`<div class="drop" style="padding:18px">${ic('upload')}<span class="small muted">Arraste o PDF aqui ou</span><button class="btn sm tinted" data-act="importGuide" data-id="${b.id}">Escolher arquivo</button></div>`}</section></div>
+    <div class="grid2">${listCard(b,'podeFalar','Pode e deve falar','yes','check')}${listCard(b,'naoPode','Não pode falar','no','xoct','vira eliminatório')}${listCard(b,'visual','Regras visuais','vis','eye','a IA olha as cenas')}${listCard(b,'obrigatorios','Itens obrigatórios','req','flag')}</div>
+    <p class="xs muted row" style="gap:6px">${ic('checkc','sm')}As alterações são salvas automaticamente.</p>`;
+  }
+  if(tab==='criterios'){
+    const loading=UI.genLoading===b.id;
+    body=`${why('A IA usa estes critérios para dar a nota. Peso maior significa mais importância. Um critério eliminatório bloqueia o envio se falhar, mesmo com a nota geral alta.')}
+    ${b.guideDirty?`<div class="tip" style="border-left-color:var(--orange-fill)">${ic('warn')}<div><b>O guia mudou</b><span class="small">Atualize os critérios para a IA considerar as mudanças.</span></div><button class="btn sm primary" data-act="genCrit" data-id="${b.id}">Atualizar</button></div>`:''}
+    <section class="card"><div class="row between"><h3 class="row" style="gap:6px">${ic('shield')}Aderência à marca ${infoBtn('aderencia')}</h3><button class="btn sm tinted" data-act="genCrit" data-id="${b.id}" ${loading?'disabled':''}>${loading?'Gerando…':`${ic('wand','sm')}Gerar de novo a partir do guia`}</button></div>
+      <div class="crit-h"><span>Critério</span><span>O que a IA verifica</span><span>Peso</span><span>Eliminatório ${infoBtn('eliminatorio')}</span></div>${critRows(b.criteria,'brand',b.id,true)}
+      <div class="row"><label class="sr" for="newCrit">Novo critério</label><input class="inp" id="newCrit" style="flex:1;min-width:220px" placeholder="Novo critério, ex.: Mostrar o produto sendo usado" data-enter="addCrit" data-scope="brand" data-id="${b.id}"><button class="btn sm" data-act="addCrit" data-scope="brand" data-id="${b.id}">${ic('plus','sm')}Adicionar critério</button></div></section>
+    <section class="card"><h3 class="row" style="gap:6px">${ic('bolt')}Potencial de performance ${infoBtn('performance')}</h3><p class="small muted">Padrão da agência para todas as marcas. Orienta o creator e não bloqueia o envio.</p>${critRows(S.perf,'perf','',false)}</section>
+    <section class="card"><h3 class="row" style="gap:6px">Nota mínima para enviar ${infoBtn('minima')}</h3><div class="row" style="max-width:520px"><input type="range" min="50" max="95" step="5" value="${b.minScore}" data-field="minScore" data-scope="brand" data-id="${b.id}" aria-label="Nota mínima" style="flex:1"><output class="num" style="font-weight:700;font-size:1.4rem;width:44px">${b.minScore}</output></div>
+      <button class="btn tinted" style="align-self:flex-start" data-act="nav" data-to="b/brand/${b.id}/teste">Testar os critérios ${ic('right','sm')}</button></section>`;
+  }
+  if(tab==='teste'){
+    const pseudo={criteria:b.criteria,perf:S.perf,minScore:b.minScore,mensagem:'',cta:'',cupom:'—',duracao:'60 a 90 s'};
+    const tests=['ruim','medio','bom'].map(q=>({q,r:analyze(pseudo,b,q,3)}));
+    body=`${why('Antes de usar com creators, veja como três vídeos de exemplo seriam avaliados com os pesos e a nota mínima atuais. Se a nota não fizer sentido, ajuste os critérios.')}
+    <div class="grid3">${tests.map(({q,r})=>`<article class="card" style="align-items:center;text-align:center"><span class="eyebrow">${QLABEL[q]}</span>
+      <div class="rings2" style="width:100%"><div class="rbox">${ring(r.ader,aderColor(r.ader,b.minScore),78,'Aderência')}</div><div class="rbox">${ring(r.perf,perfColor(r.perf),78,'Performance')}</div></div>
+      ${r.blocked?`<span class="chip bad">${ic('xoct')}Bloqueado</span><span class="xs muted">Falhou em: ${esc(r.blockedBy.join(', '))}</span>`:r.pass?`<span class="chip good">${ic('checkc')}Pode enviar</span>`:`<span class="chip warn">${ic('warn')}Abaixo do mínimo (${b.minScore})</span>`}
+      <span class="small muted">${r.findings.length+(r.minor||0)} pontos a ajustar</span><button class="btn sm" data-act="sheet" data-type="sample" data-id="${b.id}" data-q="${q}">Ver análise completa</button></article>`).join('')}</div>
+    <section class="card"><h3>Como ler</h3><div class="row" style="gap:18px"><span class="row small" style="gap:6px"><span class="chip good">${ic('checkc')}Pode enviar</span>passou da nota mínima</span><span class="row small" style="gap:6px"><span class="chip warn">${ic('warn')}Abaixo do mínimo</span>o creator ajusta e checa de novo</span><span class="row small" style="gap:6px"><span class="chip bad">${ic('xoct')}Bloqueado</span>falhou em um critério eliminatório</span></div>
+    <button class="btn tinted" style="align-self:flex-start" data-act="nav" data-to="b/brand/${b.id}/criterios">${ic('sliders','sm')}Ajustar critérios</button></section>`;
+  }
+  return `<div class="ptitle"><div class="row"><span class="avatar" style="width:46px;height:46px;background:hsl(${b.hue||210} 60% 48%)">${esc(b.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</span><div><span class="kicker">${esc(b.seg||'')}</span><h1>${esc(b.name)}</h1></div></div></div>
+    <div class="seg" role="tablist" aria-label="Seções do guia">${T('guia','Guia da marca')}${T('criterios','Critérios da IA')}${T('teste','Testar critérios')}</div>${body}`;
+}
+
+/* ---------- Resultados ---------- */
+function vBResults(tab){
+  const T=(k,l)=>`<button role="tab" aria-selected="${tab===k}" class="${tab===k?'on':''}" data-act="nav" data-to="b/results/${k}">${l}</button>`;
+  const opts=allCampOptions(); let body='';
+  if(tab==='antes'){
+    UI.cmpA=UI.cmpA||opts[0].id; UI.cmpB=UI.cmpB||(opts.find(o=>o.id==='c1')||opts[1]).id;
+    const A=campStats(UI.cmpA),B=campStats(UI.cmpB);
+    const line=(l,a,b,fmt,better)=>{const d=(a==null||b==null)?null:b-a;const cls=d==null||Math.abs(d)<1e-9||!better?'':((better==='up'?d>0:d<0)?'up':'dn');return `<tr><td>${l}</td><td class="num">${a==null?'—':fmt(a)}</td><td class="num">${b==null?'—':fmt(b)}</td><td class="d ${cls}">${d==null?'—':Math.abs(d)<1e-9?'Igual':(cls==='up'?'Melhor · ':cls==='dn'?'Pior · ':'')+(d>0?'+':'−')+fmt(Math.abs(d))}</td></tr>`};
+    body=`${why('Compare uma campanha feita antes da plataforma com uma feita com ela. Suba campanhas antigas na aba "Enviar campanha anterior".')}
+    <div class="grid2"><label class="field"><span>Campanha A</span><select class="inp" data-field="cmpA">${opts.map(o=>`<option value="${o.id}" ${o.id===UI.cmpA?'selected':''}>${esc(o.label)}</option>`).join('')}</select></label><label class="field"><span>Campanha B</span><select class="inp" data-field="cmpB">${opts.map(o=>`<option value="${o.id}" ${o.id===UI.cmpB?'selected':''}>${esc(o.label)}</option>`).join('')}</select></label></div>
+    <div class="tw"><table><thead><tr><th>Métrica</th><th>A</th><th>B</th><th>Diferença (B − A)</th></tr></thead><tbody>
+      ${line('Vídeos',A.n,B.n,x=>Math.round(x),null)}${line('Aprovados de primeira',A.first,B.first,pct,'up')}${line('Rodadas quando devolvido',A.rounds,B.rounds,x=>dec(x),'down')}${line('Tempo até aprovar (dias)',A.days,B.days,x=>dec(x),'down')}${line('Nota média de aderência',A.ader,B.ader,x=>Math.round(x),'up')}${line('Nota média de performance',A.perf,B.perf,x=>Math.round(x),'up')}${line('CTR médio',A.ctr,B.ctr,x=>dec(x,2)+'%','up')}${line('Vendas totais',A.vendas,B.vendas,x=>Math.round(x).toLocaleString('pt-BR'),'up')}
+    </tbody></table></div>
+    <p class="small muted">Vendas e CTR aparecem depois de importar os resultados dos anúncios na página da campanha.</p>`;
+  }
+  if(tab==='nota'){
+    const bt=opts.filter(o=>campStats(o.id).hasRes); UI.bt=bt.find(o=>o.id===UI.bt)?UI.bt:(bt[0]&&bt[0].id);
+    if(!UI.bt) body=empty('chart','Sem dados de vendas ainda','Envie uma campanha anterior com resultados, ou importe os resultados dos anúncios de uma campanha.',`<button class="btn tinted" data-act="nav" data-to="b/results/enviar">Enviar campanha anterior</button>`);
+    else{const Tt=campStats(UI.bt),rows=Tt.rows.filter(r=>r.vendas!=null),k=Math.min(5,Math.floor(rows.length/2));
+      const realTop=rows.slice().sort((a,b)=>b.vendas-a.vendas).slice(0,k),ourTop=rows.slice().sort((a,b)=>b.perf-a.perf).slice(0,k),hit=ourTop.filter(r=>realTop.includes(r)).length,r=pearson(rows.map(x=>x.perf),rows.map(x=>x.vendas)),saved=(rows.length-k)*300;
+      body=`${why('Teste retroativo: a IA dá nota a vídeos já publicados sem ver o resultado, e comparamos com as vendas reais. Se acertar, a marca testa em anúncio só os melhores.')}
+      <label class="field" style="max-width:480px"><span>Campanha</span><select class="inp" data-field="bt">${bt.map(o=>`<option value="${o.id}" ${o.id===UI.bt?'selected':''}>${esc(o.label)}</option>`).join('')}</select></label>
+      <div class="grid2"><section class="card chart" aria-label="Gráfico">${scatter(rows)}<div class="row small" style="gap:16px"><span class="row" style="gap:6px"><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="var(--accent)"/></svg>${k} que mais venderam</span><span class="row" style="gap:6px"><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="var(--green-fill)" stroke-width="2.5"/></svg>${k} com maior nota da IA</span></div></section>
+        <div class="stack"><div class="grid2" style="grid-template-columns:1fr 1fr"><div class="kpi"><div class="top"><span>Acertos no top ${k}</span></div><div class="v">${hit} de ${k}</div><div class="cmp">Os que mais venderam estavam entre as maiores notas</div></div><div class="kpi"><div class="top"><span>Correlação</span></div><div class="v">${dec(r,2)}</div><div class="cmp">Entre a nota e as vendas (1 = perfeita)</div></div></div>
+        <div class="card tint"><p>Testando em anúncio só os ${k} vídeos com maior nota, a marca gastaria cerca de <b>${brl(saved)}</b> a menos (a R$ 300 por vídeo) e ${hit===k?'encontraria todos':`encontraria ${hit} dos ${k}`} que mais venderam.</p></div>
+        <p class="xs muted">Dados simulados. Na validação, este teste roda com vídeos e resultados reais de uma marca parceira.</p></div></div>`}
+  }
+  if(tab==='enviar'){
+    const up=UI.upl;
+    body=`${why('Suba uma campanha já feita: os vídeos e a planilha de resultados dos anúncios. A IA dá nota a cada vídeo sem ver o resultado, para você comparar.')}
+    <section class="card" style="max-width:640px"><label class="field"><span>Nome da campanha</span><input class="inp" id="upName" value="Dia dos Pais (antes da plataforma)"></label>
+      <label class="field"><span>Marca</span><select class="inp" id="upBrand">${S.brands.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>
+      <label class="field"><span>Quantidade de vídeos</span><input class="inp" id="upN" type="number" min="6" max="20" value="12"></label>
+      <div class="drop">${ic('upload')}<b>12 vídeos + resultados.csv</b><span class="xs muted">Arquivos de exemplo desta demonstração</span></div>
+      ${up?`<div class="stack" style="gap:6px"><span class="small">Analisando os vídeos… ${up.p}%</span><div class="progress" role="progressbar" aria-valuenow="${up.p}" aria-valuemin="0" aria-valuemax="100"><i style="width:${up.p}%"></i></div></div>`:`<button class="btn primary" style="align-self:flex-start" data-act="uploadPast">${ic('upload','sm')}Enviar e analisar</button>`}</section>`;
+  }
+  return `<div class="ptitle"><div><h1>Resultados</h1><p>O ganho medido com os dados da própria marca, e o teste de que a nota acerta o que vende.</p></div></div>
+    <div class="seg" role="tablist" aria-label="Seções de resultados">${T('antes','Antes e depois')}${T('nota','A nota acerta o que vende?')}${T('enviar','Enviar campanha anterior')}</div>${body}`;
+}
+
+/* ---------- Folhas (modais) ---------- */
+function renderSheet(){
+  const el=$('#sheet'), s=UI.sheet;
+  if(!s){el.innerHTML='';return}
+  const wrap=(title,body,foot,wide)=>`<div class="ov" data-act="closeSheetBg"><div class="sheet ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="sh-t"><div class="sh"><h2 id="sh-t" style="font-size:1.25rem">${title}</h2><button class="iconbtn" data-act="closeSheet" aria-label="Fechar">${ic('x')}</button></div><div class="sb">${body}</div>${foot?`<div class="sf">${foot}</div>`:''}</div></div>`;
+  let h='';
+  if(s.type==='gloss'){const g=GLOSS[s.k];h=wrap(esc(g.t),`<p>${esc(g.x)}</p>`,`<button class="btn primary" data-act="closeSheet">Entendi</button>`)}
+  if(s.type==='help') h=wrap('Ajuda e glossário',`<p class="muted">Termos usados na plataforma, em linguagem simples.</p><div class="faq" style="max-width:none">${Object.values(GLOSS).map(g=>`<details><summary>${esc(g.t)} ${ic('right')}</summary><p>${esc(g.x)}</p></details>`).join('')}</div>
+    <div class="group">${[['spark','var(--indigo-fill)','Rever a introdução','replayOnb'],['target','var(--accent)','Abrir a demonstração guiada','tourOpen'],['repeat','var(--red-fill)','Recomeçar com os dados de exemplo','askReset']].map(([i,c,t,a])=>`<button class="gi" data-act="${a}" data-role="${S.role||'b'}"><span class="gic" style="background:${c}">${ic(i,'sm')}</span><span class="gt"><b>${t}</b></span>${ic('right','sm')}</button>`).join('')}</div>`,'',true);
+  if(s.type==='reset') h=wrap('Recomeçar a demonstração?',`<div class="verdict block">${ic('warn')}<span>Isso apaga todas as alterações<small>Guias, campanhas, checagens e aprovações voltam aos dados de exemplo. Não dá para desfazer.</small></span></div>`,`<button class="btn" data-act="closeSheet">Cancelar</button><button class="btn danger" data-act="doReset">Recomeçar</button>`);
+  if(s.type==='analysis'){const v=S.videos.find(x=>x.id===s.id),c=camp(v.campaignId),x=last(v),fixed=v.versions.slice(0,-1).reduce((a,y)=>a+y.findings.length+(y.minor||0),0);
+    h=wrap(`${esc(cr(v.creatorId).name)} · versão ${v.versions.length}`,`<p class="small muted">${esc(brand(c.brandId).name)} · ${esc(c.name)}</p>${v.versions.length>1?`<div class="card tint" style="gap:4px"><b>${fixed} problemas corrigidos pelo creator antes de enviar</b><span class="small muted">Versões: ${v.versions.map(y=>`v${y.n} ${y.ader}/${y.perf}`).join(' → ')}</span></div>`:''}${vResultBody(x,{noInfo:true,open:true})}`,
+      v.status==='enviado'?`<button class="btn warn" data-act="sheet" data-type="adjust" data-id="${v.id}">Pedir ajuste</button><button class="btn good" data-act="approve" data-id="${v.id}">${ic('check','sm')}Aprovar</button>`:`<button class="btn" data-act="closeSheet">Fechar</button>`,true)}
+  if(s.type==='sample'){const b=brand(s.id),pseudo={criteria:b.criteria,perf:S.perf,minScore:b.minScore,mensagem:'',cta:'',cupom:'—',duracao:'60 a 90 s'};
+    h=wrap(`${QLABEL[s.q]} · ${esc(b.name)}`,vResultBody(analyze(pseudo,b,s.q,3),{noInfo:true,open:true}),`<button class="btn primary" data-act="closeSheet">Fechar</button>`,true)}
+  if(s.type==='adjust'){const v=S.videos.find(x=>x.id===s.id),c=camp(v.campaignId),b=brand(c.brandId),t=UI.adjType||'';
+    const O=(k,l)=>`<button type="button" role="radio" aria-checked="${t===k}" class="${t===k?'on':''}" data-act="adjType" data-t="${k}">${l}</button>`;
+    h=wrap(`Pedir ajuste a ${esc(cr(v.creatorId).name)}`,`<label class="field"><span>O que precisa mudar</span><textarea class="inp" id="adjText" placeholder="Ex.: O copo de plástico aparece no começo. Use copo de vidro.">${esc(UI.adjText||'')}</textarea></label>
+      ${UI.sheetErr?`<p class="err" role="alert">${ic('warn','sm')}${esc(UI.sheetErr)}</p>`:''}
+      <div class="field"><span id="lbl-rule">Isso vale para todos os vídeos da marca?</span><div class="seg" role="radiogroup" aria-labelledby="lbl-rule" style="flex-wrap:wrap">${O('','Só este vídeo')}${O('naoPode','Não pode falar')}${O('visual','Regra visual')}${O('obrigatorios','Obrigatório')}</div>
+      <span class="hint">${t?`A regra entra no guia de ${esc(b.name)}, e a IA passa a checar isso para todos os creators. É assim que a marca ensina a IA.`:'O creator recebe o seu comentário e envia uma nova versão.'}</span></div>`,
+      `<button class="btn" data-act="closeSheet">Cancelar</button><button class="btn warn" data-act="sendAdjust" data-id="${v.id}">Enviar pedido</button>`)}
+  if(s.type==='batch'){const f=UI.apprCamp||'all',vs=S.videos.filter(v=>v.status==='enviado'&&last(v).ader>=85&&(f==='all'||v.campaignId===f));
+    h=wrap(`Aprovar ${vs.length} ${vs.length===1?'vídeo':'vídeos'}?`,`<p class="muted">Os pagamentos destes creators serão liberados. Você pode desfazer logo depois, pelo aviso.</p><div class="group" style="box-shadow:none;background:var(--surface-2)">${vs.map(v=>`<div class="gi noicon"><span class="gt"><b>${esc(cr(v.creatorId).name)}</b><span class="xs muted">${esc(camp(v.campaignId).name)} · ${brl(camp(v.campaignId).pagamento)}</span></span><span class="chip good">${ic('shield')}${last(v).ader}</span></div>`).join('')}</div>`,
+      `<button class="btn" data-act="closeSheet">Cancelar</button><button class="btn good" data-act="batchDo">${ic('check','sm')}Aprovar ${vs.length}</button>`)}
+  if(s.type==='newBrand') h=wrap('Adicionar marca',`<label class="field"><span>Nome da marca</span><input class="inp" id="nbName" placeholder="Ex.: Café Serra"></label>
+    <label class="field"><span>Segmento</span><select class="inp" id="nbSeg"><option value="saude">Suplemento · saúde</option><option value="moda">Moda</option><option value="geral">Outro</option></select></label>
+    ${UI.sheetErr?`<p class="err" role="alert">${ic('warn','sm')}${esc(UI.sheetErr)}</p>`:''}<p class="small muted">Depois, importe o guia da marca para preencher as regras.</p>`,
+    `<button class="btn" data-act="closeSheet">Cancelar</button><button class="btn primary" data-act="createBrand">Criar marca</button>`);
+  el.innerHTML=h;
+  const f=el.querySelector('textarea,input:not([type=checkbox]),select'); if(f&&!s.noFocus) setTimeout(()=>f.focus(),30);
+}
+
+/* ================================================================
+   Área do creator (celular)
+   ================================================================ */
+function vResultBody(x,opts={}){
+  const vcls=x.blocked?'block':x.pass?'ok':'no', vic=x.blocked?'xoct':x.pass?'checkc':'warn';
+  const vt=x.blocked?'Não pode ser enviado ainda':x.pass?'Pronto para enviar':'Ajuste antes de enviar';
+  const vs=x.blocked?(x.blockedBy.includes('Nada do que a marca não permite')?'O vídeo tem uma fala que a marca não permite. Corrija o ponto marcado em vermelho.':`Falhou no critério eliminatório: ${x.blockedBy.join(', ')}.`):x.pass?`A aderência passou da nota mínima da marca (${x.min}).`:`A aderência está abaixo da nota mínima da marca (${x.min}).`;
+  const nums=new Map(x.findings.map((f,i)=>[f,i+1]));
+  const must=x.findings.filter(f=>f.sev==='block'||f.sev==='alta'), rec=x.findings.filter(f=>!(f.sev==='block'||f.sev==='alta'));
+  const cls=f=>f.kind==='performance'?'pf':f.sev!=='media'?'hi':'';
+  const fx=f=>`<div class="fx"><span class="n ${cls(f)}" aria-hidden="true">${nums.get(f)}</span><div class="t"><div><span class="ts">${mmss(f.t)}</span> · <b>${esc(f.label)}</b> ${f.sev==='block'?`<span class="chip bad">${ic('xoct')}Impede o envio</span>`:f.kind==='performance'?`<span class="chip ind">${ic('bolt')}Performance</span>`:''}</div><div>${esc(f.text)}</div><div class="how">${ic('wand')}<span>${esc(f.fix)}</span></div></div></div>`;
+  const I=(k,l)=>opts.noInfo?'':infoBtn(k,l);
+  return `<div class="stack" style="gap:14px">
+    <div class="verdict ${vcls}" role="status">${ic(vic)}<span>${vt}<small>${esc(vs)}</small></span></div>
+    <div class="rings2"><div class="rbox">${ring(x.ader,aderColor(x.ader,x.min),92,'Aderência')}<span class="l">Aderência à marca ${I('aderencia','aderência')}</span><span class="s">Mínimo ${x.min} · ${x.ader>=x.min?'passou':'não passou'}</span></div>
+      <div class="rbox">${ring(x.perf,perfColor(x.perf),92,'Performance')}<span class="l">Performance ${I('performance','performance')}</span><span class="s">Orienta · não bloqueia</span></div></div>
+    ${x.findings.length?`<div><span class="eyebrow">Onde ajustar no vídeo</span><div class="tl" role="img" aria-label="Linha do tempo do vídeo com ${x.findings.length} pontos a ajustar">${x.findings.map(f=>`<span class="mk ${cls(f)}" style="left:${clamp(f.t/x.dur*100,5,95)}%">${nums.get(f)}</span>`).join('')}</div><div class="tl-l"><span>0:00</span><span>${mmss(x.dur)}</span></div></div>
+      ${must.length?`<div><h3>Corrija antes de enviar</h3>${must.map(fx).join('')}</div>`:''}
+      ${rec.length?`<div><h3>Recomendado</h3>${rec.map(fx).join('')}</div>`:''}
+      ${x.minor?`<p class="small muted">Mais ${x.minor} ${x.minor===1?'ponto menor aparece':'pontos menores aparecem'} no detalhe da nota.</p>`:''}`
+      :`<p class="row" style="gap:6px;color:var(--green);font-weight:600">${ic('checkc')}Nenhum ponto a ajustar.</p>`}
+    <details class="calc" ${opts.open?'':''}><summary>${ic('list','sm')}Como a nota foi calculada (${x.items.length+x.pitems.length} critérios)</summary><div style="margin-top:10px">
+      <span class="eyebrow">Aderência</span>${x.items.map(i=>`<div class="ci"><span>${esc(i.label)} <span class="muted">· peso ${i.weight}</span>${i.elim?` <span class="chip bad">${ic('xoct')}Eliminatório</span>`:''}</span><div class="track"><i class="${i.score>=80?'good':i.score>=60?'warn':'bad'}" style="width:${i.score}%"></i></div><span class="v">${i.score}</span></div>`).join('')}
+      <span class="eyebrow" style="display:block;margin-top:8px">Performance</span>${x.pitems.map(i=>`<div class="ci"><span>${esc(i.label)} <span class="muted">· peso ${i.weight}</span></span><div class="track"><i class="${i.score>=75?'ind':i.score>=60?'warn':'bad'}" style="width:${i.score}%"></i></div><span class="v">${i.score}</span></div>`).join('')}</div></details>
+  </div>`;
+}
+function statusBar(){return `<div class="sbar" aria-hidden="true"><span>9:41</span><span class="isl"></span><span class="si"><svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg><i></i></span></div>`}
+function cNota(){const mine=S.videos.filter(v=>v.creatorId===S.me&&(v.status==='enviado'||v.status==='aprovado')),b=cr(S.me);return mine.length?Math.round((b.nota*b.entregas+mine.reduce((a,v)=>a+last(v).ader,0))/(b.entregas+mine.length)):b.nota}
+function vCreatorApp(){
+  const [,p0,id]=S.route.split('/'), p=p0||'home';
+  const v=p==='campaign'?vCCampaign(id):p==='check'?vCCheck(id):p==='history'?vCHistory():p==='profile'?vCProfile():vCHome();
+  const tabs=v.tabs===false?'':`<nav class="tabbar" aria-label="Abas">${[['home','Campanhas','megaphone'],['history','Histórico','clock'],['profile','Perfil','user']].map(([k,l,i])=>`<button class="${p===k?'on':''}" data-act="nav" data-to="c/${k}" ${p===k?'aria-current="page"':''}>${ic(i)}<span>${l}</span></button>`).join('')}</nav>`;
+  return `<div class="cwrap"><div class="device"><div class="screen" role="region" aria-label="Aplicativo do creator">${statusBar()}${v.nav||''}<div class="scroll" id="cscroll">${v.body}</div>${v.bottom||''}${tabs}</div></div><aside class="cside">${vCSide(p,id)}</aside></div>`;
+}
+function cCampCard(c){
+  const b=brand(c.brandId), v=myVideo(c.id), inv=c.invites[S.me]==='convidado';
+  const next=inv?'Ver convite':!v?'Ler o cartão e checar o vídeo':v.status==='checando'?(last(v).pass?'Pronto para enviar':'Ajustar e checar de novo'):v.status==='enviado'?'Aguardando aprovação da marca':v.status==='ajuste'?'A marca pediu um ajuste':'Aprovado · pagamento liberado';
+  return `<button class="ccard" data-act="nav" data-to="c/campaign/${c.id}"><div class="row between"><span class="xs muted">${esc(b.name)}</span>${inv?`<span class="chip warn">${ic('bell')}Novo convite</span>`:vStatus(v)}</div><b style="font-size:1.08rem">${esc(c.name)}</b><span class="small muted">${brl(c.pagamento)} por vídeo · prazo ${esc(c.prazo)}</span><span class="nx">${esc(next)} ${ic('right','sm')}</span></button>`;
+}
+function vCHome(){
+  const inv=S.campaigns.filter(c=>c.invites[S.me]==='convidado'), act=S.campaigns.filter(c=>c.invites[S.me]==='aceito');
+  return {body:`<h1 class="largetitle">Campanhas</h1><p class="muted" style="margin-top:-8px">Olá, ${esc(cr(S.me).name.split(' ')[0])}. ${inv.length?`Você tem ${inv.length} ${inv.length===1?'convite novo':'convites novos'}.`:'Tudo em dia por aqui.'}</p>
+    ${tip('c-home','Como funciona','Abra a campanha, leia o cartão da marca e cheque o vídeo antes de enviar. Nada vai para a marca até você decidir.')}
+    ${inv.length?`<span class="gh" style="margin:4px 4px 0">Novos convites</span>${inv.map(cCampCard).join('')}`:''}
+    <span class="gh" style="margin:4px 4px 0">Em andamento</span>${act.map(cCampCard).join('')||'<p class="small muted">Nenhuma campanha em andamento.</p>'}`};
+}
+function statusTimeline(c,v){
+  const ok=v.status==='aprovado';
+  const st=[['Checado antes de enviar',1],[`Enviado para ${brand(c.brandId).name}`,1],[ok?'Aprovado pela marca':'Aguardando aprovação da marca',ok?1:2],[ok?`Pagamento de ${brl(c.pagamento)} liberado`:`Pagamento de ${brl(c.pagamento)} liberado na aprovação`,ok?1:0]];
+  return `<section class="card" aria-label="Status do vídeo" style="padding:16px"><div class="row between"><h3>Status do vídeo</h3>${vStatus(v)}</div><div class="tlst">${st.map(([t,s],i)=>`<div class="tls ${s===1?'done':s===2?'now':''}"><span class="d">${s===1?ic('check'):i+1}</span><span class="${s===1?'':'muted'}">${esc(t)}</span></div>`).join('')}</div></section>`;
+}
+function vCCampaign(id){
+  const c=camp(id); if(!c) return {body:'<p>Campanha não encontrada.</p>'};
+  const b=brand(c.brandId), v=myVideo(c.id), inv=c.invites[S.me];
+  const nav=`<div class="navbar"><button class="back" data-act="nav" data-to="c/home">${ic('left')}Campanhas</button></div>`;
+  let body=`<div><span class="small muted">${esc(b.name)}</span><h1 class="largetitle" style="font-size:1.8rem">${esc(c.name)}</h1></div>
+    <div class="row" style="gap:6px"><span class="chip">${ic('money')}${brl(c.pagamento)} por vídeo</span><span class="chip">${ic('cal')}Prazo ${esc(c.prazo)}</span><span class="chip">${ic('video')}${esc(c.formato)}</span></div>`;
+  if(v&&v.status==='ajuste') body+=`<div class="verdict block">${ic('undo')}<span>A marca pediu um ajuste<small>"${esc(v.note)}"</small></span></div>`;
+  if(v&&(v.status==='enviado'||v.status==='aprovado')) body+=statusTimeline(c,v);
+  if(inv==='convidado') body+=`<p class="small muted">Leia o cartão abaixo antes de aceitar. É tudo o que a marca precisa que apareça no vídeo.</p>`;
+  body+=vCard(c);
+  let bottom='';
+  if(inv==='convidado') bottom=`<div class="bottomcta"><button class="btn primary" data-act="accept" data-id="${c.id}">Aceitar convite</button><button class="btn plain" data-act="decline" data-id="${c.id}">Agora não</button></div>`;
+  else if(!v) bottom=`<div class="bottomcta"><button class="btn primary" data-act="nav" data-to="c/check/${c.id}">${ic('spark')}Checar meu vídeo</button><span class="xs muted" style="text-align:center">Nada é enviado à marca até você decidir.</span></div>`;
+  else if(v.status==='checando') bottom=`<div class="bottomcta"><button class="btn primary" data-act="nav" data-to="c/check/${c.id}">${ic('spark')}Ver resultado da checagem</button></div>`;
+  else if(v.status==='ajuste') bottom=`<div class="bottomcta"><button class="btn primary" data-act="newVersion" data-id="${c.id}">${ic('upload')}Enviar nova versão</button></div>`;
+  return {nav,body,bottom,tabs:false};
+}
+function chkState(id){
+  const v=myVideo(id);
+  if(!UI.chk[id]) UI.chk[id]={stage:v&&(v.status==='enviado'||v.status==='aprovado')?'sent':v&&v.status==='checando'&&v.versions.length?'result':'upload',file:null,q:v&&v.versions.length?'bom':'ruim',p:0};
+  return UI.chk[id];
+}
+const CHK_STEPS=[[0,'Recebendo o vídeo'],[18,'Transcrevendo a fala'],[40,'Lendo as cenas e o produto'],[64,'Comparando com o cartão da marca'],[86,'Calculando o potencial de performance']];
+function vCCheck(id){
+  const c=camp(id); if(!c) return {body:'<p>Campanha não encontrada.</p>'};
+  const b=brand(c.brandId), v=myVideo(id), st=chkState(id);
+  const nav=`<div class="navbar"><button class="back" data-act="nav" data-to="c/campaign/${id}">${ic('left')}${esc(c.name)}</button></div>`;
+  if(st.stage==='analyzing') return {nav,tabs:false,body:`<h1 class="largetitle" style="font-size:1.8rem">Analisando o vídeo</h1><p class="muted">${esc(st.file||'')}</p>
+    <div class="card" style="padding:16px"><div class="row between"><b>${st.p}%</b><span class="xs muted">cerca de ${Math.max(1,Math.round((100-st.p)/40))} s</span></div><div class="progress" role="progressbar" aria-valuenow="${st.p}" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso da análise"><i style="width:${st.p}%"></i></div>
+      <div class="tlst" style="margin-top:6px">${CHK_STEPS.map(([t,l],i)=>{const next=CHK_STEPS[i+1]?CHK_STEPS[i+1][0]:100, done=st.p>=next, now=!done&&st.p>=t;return `<div class="tls ${done?'done':now?'now':''}"><span class="d">${done?ic('check'):i+1}</span><span class="${done||now?'':'muted'}">${l}</span></div>`}).join('')}</div></div>
+    <div class="tip" style="box-shadow:none">${ic('spark')}<div><b>Enquanto isso</b><span class="small">Vídeos que mostram o produto nos 3 primeiros segundos costumam performar melhor.</span></div><span></span></div>`};
+  if(st.stage==='sent') return {nav,tabs:false,body:`<div class="empty" style="padding:26px 10px 8px">${ic('checkc','xl')}<h2>Enviado para ${esc(b.name)}</h2><p class="muted small">A marca recebe o seu vídeo já checado. Você é avisada quando ele for aprovado.</p></div>${v?statusTimeline(c,v):''}`,
+    bottom:`<div class="bottomcta"><button class="btn primary" data-act="nav" data-to="c/home">Voltar para campanhas</button></div>`};
+  if(st.stage==='result'&&v&&v.versions.length){
+    const x=last(v);
+    return {nav,tabs:false,body:`<div><span class="small muted">Versão ${x.n}${x.file?` · ${esc(x.file)}`:''}</span><h1 class="largetitle" style="font-size:1.8rem">Resultado</h1></div>${vResultBody(x)}
+      ${v.versions.length>1?`<div class="card" style="padding:14px;gap:6px"><b class="small">Suas versões</b><div class="row" style="gap:6px">${v.versions.map((y,i)=>`<span class="chip ${y.pass?'good':'warn'}">v${y.n} · ${y.ader}</span>${i<v.versions.length-1?ic('arrow','sm'):''}`).join('')}</div></div>`:''}`,
+      bottom:x.pass?`<div class="bottomcta"><button class="btn good" data-act="send" data-id="${id}">${ic('upload')}Enviar para ${esc(b.name)}</button><button class="btn plain" data-act="newVersion" data-id="${id}">Subir nova versão</button></div>`
+        :`<div class="bottomcta"><button class="btn primary" data-act="newVersion" data-id="${id}">${ic('upload')}Subir nova versão</button><span class="xs muted" style="text-align:center">Você envia quando a aderência passar de ${x.min}${x.blocked?' e o ponto em vermelho for corrigido':''}.</span></div>`};
+  }
+  const Q3=(k,l)=>`<button type="button" role="radio" aria-checked="${st.q===k}" class="${st.q===k?'on':''}" data-act="chkQ" data-id="${id}" data-q="${k}">${l}</button>`;
+  return {nav,tabs:false,body:`<div><h1 class="largetitle" style="font-size:1.8rem">Checar vídeo</h1><p class="muted" style="margin-top:4px">A IA confere o vídeo com o cartão de ${esc(b.name)}. Nada é enviado até você decidir.</p></div>
+    ${v&&v.status==='ajuste'?`<div class="verdict block">${ic('undo')}<span>Pedido da marca<small>"${esc(v.note)}"</small></span></div>`:''}
+    <div class="drop ${st.file?'has':''}">${st.file?`${ic('video')}<b>${esc(st.file)}</b><span class="xs muted">Pronto para analisar</span><button class="link small" data-act="pickFile" data-id="${id}">Trocar vídeo</button>`:`${ic('upload')}<b>Escolha o vídeo da campanha</b><span class="xs muted">MP4 ou MOV, até 3 minutos</span><button class="btn sm tinted" data-act="pickFile" data-id="${id}">Escolher vídeo</button>`}</div>
+    <details class="card" style="padding:14px" ${UI.demoOpen?'open':''}><summary class="row" style="gap:6px;cursor:pointer;font-weight:600">${ic('sliders','sm')}Opções da demonstração</summary><div class="stack" style="gap:8px;margin-top:10px"><span class="small muted">Escolha como o vídeo de teste deve sair. Na versão real, a nota vem do vídeo enviado.</span><div class="seg full" role="radiogroup" aria-label="Qualidade do vídeo de teste">${Q3('ruim','Com problemas')}${Q3('medio','Mediano')}${Q3('bom','Bom')}</div></div></details>
+    ${v&&v.versions.length?`<p class="small muted">Última checagem: versão ${last(v).n}, aderência ${last(v).ader}.</p>`:''}`,
+    bottom:`<div class="bottomcta"><button class="btn primary" data-act="runCheck" data-id="${id}">${ic('spark')}Analisar vídeo</button></div>`};
+}
+function vCHistory(){
+  const mine=S.videos.filter(v=>v.creatorId===S.me), base=cr(S.me), n=cNota();
+  const paid=mine.filter(v=>v.status==='aprovado').reduce((a,v)=>a+camp(v.campaignId).pagamento,0);
+  return {body:`<h1 class="largetitle">Histórico</h1>
+    <div class="card" style="flex-direction:row;align-items:center;gap:16px;padding:16px">${ring(n,'var(--green-fill)',96,'Entrega')}<div class="stack" style="gap:4px"><b>Nota de entrega ${infoBtn('entrega')}</b><span class="small muted">Média da aderência dos vídeos que você enviou. As marcas veem essa nota ao convidar.</span>${n>=85?`<span class="chip good" style="align-self:flex-start">${ic('shield')}Creator confiável</span>`:''}</div></div>
+    <div class="grid2" style="grid-template-columns:1fr 1fr;gap:10px"><div class="kpi" style="padding:14px"><div class="top"><span>De primeira</span></div><div class="v" style="font-size:1.6rem">${pct(base.primeira)}</div></div><div class="kpi" style="padding:14px"><div class="top"><span>Pagamentos liberados</span></div><div class="v" style="font-size:1.6rem">${brl(paid)}</div></div></div>
+    <span class="gh" style="margin:4px 4px 0">Nesta plataforma</span>
+    <div class="group">${mine.map(v=>{const c=camp(v.campaignId);return `<button class="gi noicon" data-act="nav" data-to="c/campaign/${c.id}"><span class="gt"><b>${esc(c.name)}</b><span class="xs muted">${esc(brand(c.brandId).name)} · ${v.versions.length} checagens · aderência ${last(v).ader}</span></span>${vStatus(v)}</button>`}).join('')||'<div class="gi noicon"><span class="small muted">Nenhum vídeo ainda.</span></div>'}</div>`};
+}
+function vCProfile(){
+  const me=cr(S.me);
+  return {body:`<h1 class="largetitle">Perfil</h1>
+    <div class="card" style="flex-direction:row;align-items:center;gap:14px;padding:16px"><span class="avatar" style="width:56px;height:56px;font-size:1.1rem;background:hsl(${me.hue} 60% 55%)">${esc(me.name.split(' ').map(x=>x[0]).join(''))}</span><div><b style="font-size:1.1rem">${esc(me.name)}</b><div class="small muted">${esc(me.handle)} · ${me.fol} seguidores</div></div></div>
+    <div class="group">
+      <div class="gi"><span class="gic" style="background:var(--green-fill)">${ic('shield','sm')}</span><span class="gt"><b>Nota de entrega</b></span><b>${cNota()}</b></div>
+      <div class="gi"><span class="gic" style="background:var(--red-fill)">${ic('bell','sm')}</span><span class="gt"><b>Avisos de aprovação</b><span class="xs muted">Quando a marca aprovar ou pedir ajuste</span></span><label class="switch"><input type="checkbox" checked data-field="notif" aria-label="Avisos de aprovação"><span></span></label></div>
+      <button class="gi" data-act="replayOnb" data-role="c"><span class="gic" style="background:var(--indigo-fill)">${ic('spark','sm')}</span><span class="gt"><b>Rever a introdução</b></span>${ic('right','sm')}</button>
+      <button class="gi" data-act="sheet" data-type="help"><span class="gic" style="background:var(--accent)">${ic('help','sm')}</span><span class="gt"><b>Ajuda e glossário</b></span>${ic('right','sm')}</button>
+    </div>
+    <div class="group"><button class="gi noicon" data-act="logout"><span class="gt"><b style="color:var(--red)">Sair</b></span></button></div>`};
+}
+const OBS={
+  home:['Convites e campanhas em andamento, cada uma com o próximo passo escrito.','O status usa ícone e texto, não só cor.'],
+  campaign:['O cartão da marca substitui o briefing longo.','O botão principal fica embaixo, ao alcance do polegar.'],
+  check:['A análise mostra progresso real e uma dica enquanto espera.','Duas notas: a aderência bloqueia o envio, a performance orienta.','Cada ajuste mostra o segundo exato do vídeo e como corrigir.'],
+  history:['A nota de entrega vira reputação entre marcas.','Pagamentos liberados ficam visíveis.'],
+  profile:['A introdução pode ser revista a qualquer momento.','Avisos de aprovação podem ser desligados.'],
+};
+function vCSide(p){
+  return `<span class="kicker" style="color:var(--green)">Visão do creator</span><h2>No celular do influenciador</h2><p class="muted">O creator não recebe um briefing longo pelo WhatsApp. Recebe um cartão curto e descobre, antes de enviar, o que ajustar.</p>
+    <div class="card"><h3 class="row" style="gap:8px">${ic('eye')}O que observar nesta tela</h3><ul class="small" style="display:flex;flex-direction:column;gap:6px">${(OBS[p]||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+    <button class="btn" style="align-self:flex-start" data-act="switchRole">${ic('monitor','sm')}Ver como marca</button>`;
+}
+
+/* ================================================================
+   Ações, eventos e inicialização
+   ================================================================ */
+let S; try{const r=localStorage.getItem(KEY);S=r?JSON.parse(r):null}catch(e){S=null}
+if(!S||S.v!==2) S=seed();
+const UI={tour:null,sheet:null,toast:null,undo:null,chk:{},wizard:null,wizErr:null,apprTab:'fila',apprCamp:'all',cmpA:null,cmpB:null,bt:null,loginRole:'b',authMode:'entrar',loginErr:null,onbStep:0,genLoading:null,importing:null,upl:null,adjType:'',adjText:'',sheetErr:null,lastRoute:null,scrollTo:null};
+
+const snap=()=>{UI.undo=JSON.stringify(S)};
+function critListFor(scope,id){if(scope==='brand')return brand(id).criteria;if(scope==='perf')return S.perf;if(scope==='wizard')return UI.wizard.criteria;if(scope==='wperf')return UI.wizard.perf;return []}
+function propagateBrand(b){S.campaigns.filter(c=>c.brandId===b.id).forEach(c=>{const extra=c.criteria.filter(x=>x.id==='camp_msg'||x.id==='camp_cta');c.criteria=genCriteria(b,c.criteria.filter(x=>x.id!=='camp_msg'&&x.id!=='camp_cta')).concat(extra)})}
+function closeSheet(){UI.sheet=null;UI.sheetErr=null;renderSheet()}
+function finishLogin(role){
+  S.role=role; UI.loginErr=null;
+  if(UI.tour&&UI.tour.i===1) UI.tour.i=2;
+  if(!S.onb[role]){UI.onbStep=0;go('onb/'+role)} else go(role==='b'?'b/home':'c/home');
+}
+function tourGo(i){
+  const s=TOUR[i]; UI.tour={i};
+  if(s.login){UI.loginRole=s.login;UI.authMode='entrar';go('login');return}
+  if(s.role){S.role=s.role;S.onb[s.role]=true}
+  if(s.route==='b/new') newWizard();
+  if(s.route.startsWith('c/check/')){const id=s.route.split('/')[2],v=myVideo(id);if(!v||v.status==='checando')delete UI.chk[id]}
+  go(s.route);
+}
+
+const A={
+  toTop:()=>window.scrollTo({top:0,behavior:'smooth'}),
+  scrollTo:e=>{const el=document.getElementById(e.dataset.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},
+  toSite:()=>go('site'),
+  toLogin:e=>{UI.authMode=e.dataset.mode||'entrar';UI.loginErr=null;go('login')},
+  startDemo:()=>{UI.tour={i:1};UI.loginRole='b';UI.authMode='entrar';go('login')},
+  demoAs:e=>{UI.loginRole=e.dataset.role;UI.authMode='entrar';go('login')},
+  loginRole:e=>{UI.loginRole=e.dataset.role;render()},
+  authMode:e=>{UI.authMode=e.dataset.mode;UI.loginErr=null;render()},
+  forgot:()=>toast('Na demonstração não é preciso senha: a conta já está preenchida.'),
+  onbStep:e=>{UI.onbStep=clamp((UI.onbStep||0)+Number(e.dataset.d),0,2);render()},
+  onbDone:e=>{const r=e.dataset.role;S.onb[r]=true;UI.onbStep=0;go(r==='b'?'b/home':'c/home')},
+  replayOnb:e=>{const r=e.dataset.role||S.role||'b';S.role=r;UI.onbStep=0;closeSheet();go('onb/'+r)},
+  nav:e=>{if(e.dataset.tab)UI.apprTab=e.dataset.tab;go(e.dataset.to)},
+  switchRole:()=>{if(S.role==='b'){S.role='c';S.onb.c=true;go('c/home')}else{S.role='b';S.onb.b=true;go('b/approvals')}},
+  logout:()=>{S.role=null;closeSheet();go('site');toast('Você saiu da conta.')},
+  tourOpen:()=>{closeSheet();UI.tour={i:0};renderTour()},
+  tourClose:()=>{UI.tour=null;renderTour()},
+  tourStep:e=>{const i=clamp(UI.tour.i+Number(e.dataset.d),0,TOUR.length-1);tourGo(i)},
+  tourGo:e=>tourGo(Number(e.dataset.i)),
+  sheet:e=>{UI.sheet={type:e.dataset.type,id:e.dataset.id,k:e.dataset.k,q:e.dataset.q};UI.sheetErr=null;if(e.dataset.type==='adjust'){UI.adjType='';UI.adjText=''}renderSheet()},
+  closeSheet:()=>closeSheet(),
+  closeSheetBg:(e,ev)=>{if(ev.target===e)closeSheet()},
+  dismissTip:e=>{S.tips[e.dataset.k]=true;save();render()},
+  askReset:()=>{UI.sheet={type:'reset'};renderSheet()},
+  doReset:()=>{try{localStorage.removeItem(KEY)}catch(e){}S=seed();Object.assign(UI,{tour:null,sheet:null,chk:{},wizard:null,undo:null,cmpA:null,cmpB:null,bt:null});go('site');toast('Demonstração recomeçada com os dados de exemplo.')},
+  undo:()=>{if(!UI.undo)return;S=JSON.parse(UI.undo);UI.undo=null;save();closeSheet();render();toast('Ação desfeita.')},
+  /* aprovações */
+  apprTab:e=>{UI.apprTab=e.dataset.tab;render()},
+  approve:e=>{const v=S.videos.find(x=>x.id===e.dataset.id),c=camp(v.campaignId);snap();v.status='aprovado';v.days=+(0.8+v.roundsBrand*1.4+Math.random()*.8).toFixed(1);S.progress.approvedOne=true;
+    feed(`Vídeo de ${cr(v.creatorId).name} aprovado em ${c.name}. Pagamento de ${brl(c.pagamento)} liberado.`);save();closeSheet();render();toast(`Aprovado. Pagamento liberado para ${cr(v.creatorId).name.split(' ')[0]}.`,{act:'undo',label:'Desfazer'})},
+  batchDo:()=>{const f=UI.apprCamp||'all',vs=S.videos.filter(v=>v.status==='enviado'&&last(v).ader>=85&&(f==='all'||v.campaignId===f));snap();vs.forEach(v=>{v.status='aprovado';v.days=+(0.8+v.roundsBrand*1.4+Math.random()*.6).toFixed(1)});S.progress.approvedOne=true;
+    feed(`${vs.length} vídeos aprovados em lote.`);save();closeSheet();render();toast(`${vs.length} ${vs.length===1?'vídeo aprovado':'vídeos aprovados'}. Pagamentos liberados.`,{act:'undo',label:'Desfazer'})},
+  adjType:e=>{const t=$('#adjText');if(t)UI.adjText=t.value;UI.adjType=e.dataset.t;renderSheet()},
+  sendAdjust:e=>{const v=S.videos.find(x=>x.id===e.dataset.id),c=camp(v.campaignId),b=brand(c.brandId),txt=($('#adjText').value||'').trim(),type=UI.adjType;
+    if(!txt){UI.adjText='';UI.sheetErr='Escreva o que precisa mudar. O creator vai ler esse comentário.';renderSheet();return}
+    snap();v.status='ajuste';v.roundsBrand++;v.note=txt;
+    if(type){b[type].push(txt);b.criteria=genCriteria(b,b.criteria);propagateBrand(b);feed(`Nova regra no guia de ${b.name}: "${txt}".`)}
+    feed(`A marca pediu ajuste a ${cr(v.creatorId).name}.`);save();closeSheet();render();toast(type?'Ajuste pedido e regra adicionada ao guia.':`Ajuste pedido a ${cr(v.creatorId).name.split(' ')[0]}.`,{act:'undo',label:'Desfazer'})},
+  boost:e=>{const v=S.videos.find(x=>x.id===e.dataset.id);v.boosted=true;feed(`Vídeo de ${cr(v.creatorId).name} enviado para anúncio (simulado).`);save();render();toast('Vídeo enviado para anúncio (simulado).')},
+  importResults:e=>{const c=camp(e.dataset.id),vs=S.videos.filter(v=>v.campaignId===c.id&&SENT.includes(v.status)),r=rng(c.id.length*97+vs.length),res={};
+    vs.forEach(v=>{const perf=last(v).perf,ctr=+(clamp(.45+perf/100*1.9+(r()-.5)*.55,.2,4)).toFixed(2),views=Math.round(20000+r()*25000);res[v.id]={views,ctr,vendas:Math.round(views*ctr/100*(.04+perf/100*.04+(r()-.5)*.02))}});
+    S.results[c.id]=res;feed(`Resultados dos anúncios importados para ${c.name}.`);save();render();toast('Resultados importados.',{act:'goResults',label:'Ver'})},
+  goResults:()=>{UI.toast=null;renderToast();go('b/results/nota')},
+  /* campanhas */
+  newCampaign:()=>{newWizard();go('b/new')},
+  wzPrev:()=>{UI.wizErr=null;UI.wizard.step--;render()},
+  wzGo:e=>{UI.wizErr=null;UI.wizard.step=Number(e.dataset.i);render()},
+  wzNext:()=>{const w=UI.wizard;UI.wizErr=null;
+    if(w.step===1&&!w.name.trim()){UI.wizErr='Dê um nome para a campanha. Ele aparece no convite do creator.';render();return}
+    if(w.step===2&&!w.mensagem.trim()){UI.wizErr='Preencha a mensagem principal, ou use "Importar briefing". Ela vira um critério da nota.';render();return}
+    if(w.step===4&&!w.creators.length){UI.wizErr='Convide pelo menos um creator.';render();return}
+    w.step++;render();window.scrollTo(0,0)},
+  fillBrief:()=>{const w=UI.wizard,b=brand(w.brandId);Object.assign(w,b.id==='nuvem'?{objetivo:'Vendas com cupom',mensagem:'Tricô feito à mão para o dia a dia',cta:'Compre pelo link da bio',cupom:'NUVEM15',formato:'Reels',duracao:'30 a 60 s',prazo:'30/10',pagamento:500,ganchos:'"Quanto tempo leva para tricotar um suéter?"'}
+    :{objetivo:'Vendas com cupom',mensagem:'Energia sem cafeína para treinar de manhã',cta:'Use o cupom no link da bio',cupom:'VITTA15',formato:'Reels e TikTok',duracao:'60 a 90 s',prazo:'30/10',pagamento:700,ganchos:'"Treino às 6h sem café. Te mostro."'});if(!w.name)w.name='Treino de manhã';UI.wizErr=null;render();toast('Briefing lido. Confira os campos preenchidos.')},
+  wzPublish:()=>{const w=UI.wizard;wzEnsureCrit();const id='c'+Date.now(),invites={};w.creators.forEach(c=>invites[c]='convidado');
+    S.campaigns.push({id,brandId:w.brandId,name:w.name||'Nova campanha',objetivo:w.objetivo,mensagem:w.mensagem,cta:w.cta,cupom:w.cupom||'—',formato:w.formato,duracao:w.duracao,prazo:w.prazo||'—',pagamento:Number(w.pagamento)||0,ganchos:w.ganchos,minScore:w.minScore,criteria:w.criteria,perf:w.perf,invites,created:'hoje'});
+    S.progress.createdCampaign=true;feed(`Campanha ${w.name} publicada. ${w.creators.length} creators convidados.`);UI.wizard=null;go('b/campaign/'+id);toast(`Campanha publicada. ${w.creators.length} ${w.creators.length===1?'convite enviado':'convites enviados'}.`)},
+  /* guias */
+  rmItem:e=>{const b=brand(S.route.split('/')[2]),removed=b[e.dataset.list][+e.dataset.i];snap();b[e.dataset.list].splice(+e.dataset.i,1);b.guideDirty=true;save();render();toast(`Removido: ${removed}`,{act:'undo',label:'Desfazer'})},
+  addItem:e=>{const b=brand(S.route.split('/')[2]),inp=$('#add-'+e.dataset.list),val=inp&&inp.value.trim();if(!val){if(inp)inp.focus();return}b[e.dataset.list].push(val);b.guideDirty=true;save();render();const n=$('#add-'+e.dataset.list);if(n)n.focus()},
+  importGuide:e=>{const b=brand(e.dataset.id);UI.importing={id:b.id,p:0};render();
+    const tick=()=>{UI.importing.p=Math.min(100,UI.importing.p+17);if(UI.importing.p<100){render();setTimeout(tick,160);return}
+      const key=/saúde|suplemento/i.test(b.seg)?'saude':/moda/i.test(b.seg)?'moda':'geral';if(!b.posicionamento){Object.assign(b,JSON.parse(JSON.stringify(GUIDE_TEMPLATES[key])));b.guideDirty=true}
+      UI.importing=null;save();render();toast(`Guia lido: ${b.podeFalar.length+b.naoPode.length+b.visual.length+b.obrigatorios.length} regras encontradas.`)};setTimeout(tick,160)},
+  genCrit:e=>{const b=brand(e.dataset.id);UI.genLoading=b.id;render();setTimeout(()=>{b.criteria=genCriteria(b,b.criteria);b.guideDirty=false;propagateBrand(b);UI.genLoading=null;save();render();toast('Critérios atualizados a partir do guia.')},800)},
+  addCrit:e=>{const inp=$('#newCrit'),val=inp&&inp.value.trim();if(!val){if(inp)inp.focus();return}const scope=e.dataset.scope||'brand',id=e.dataset.id;critListFor(scope,id).push({id:'x'+Date.now(),label:val,weight:10,elim:false,custom:true,checks:[val]});if(scope==='brand')propagateBrand(brand(id));save();render();toast('Critério adicionado.')},
+  rmCrit:e=>{snap();critListFor(e.dataset.scope,e.dataset.id).splice(+e.dataset.i,1);if(e.dataset.scope==='brand')propagateBrand(brand(e.dataset.id));save();render();toast('Critério removido.',{act:'undo',label:'Desfazer'})},
+  createBrand:()=>{const name=($('#nbName').value||'').trim();if(!name){UI.sheetErr='Dê um nome para a marca.';renderSheet();return}
+    const seg=$('#nbSeg').value,segL={saude:'Suplemento · saúde',moda:'Moda',geral:'Outro'}[seg],b={id:'b'+Date.now(),name,seg:segL,hue:Math.round(Math.random()*360),posicionamento:'',publico:'',tom:'',podeFalar:[],naoPode:[],visual:[],obrigatorios:[],minScore:75,guideDirty:false};
+    b.criteria=genCriteria(b);S.brands.push(b);closeSheet();feed(`Marca ${name} adicionada.`);go('b/brand/'+b.id+'/guia');toast('Marca criada. Agora importe ou preencha o guia.')},
+  uploadPast:()=>{const name=($('#upName').value||'').trim()||'Campanha anterior',bid=$('#upBrand').value,n=clamp(parseInt($('#upN').value)||12,6,20);UI.upl={p:0};render();
+    const tick=()=>{UI.upl.p=Math.min(100,UI.upl.p+12);if(UI.upl.p<100){render();setTimeout(tick,170);return}
+      const id='p'+Date.now();S.past.push({id,name,brandId:bid,when:'enviada hoje',before:true,videos:genPastVideos(n,(Date.now()%1000)+3,true)});UI.upl=null;UI.cmpA=id;UI.bt=id;feed(`Campanha "${name}" enviada com ${n} vídeos e resultados.`);save();go('b/results/nota');toast(`${n} vídeos analisados.`)};setTimeout(tick,170)},
+  /* creator */
+  accept:e=>{const c=camp(e.dataset.id);c.invites[S.me]='aceito';feed(`${cr(S.me).name} aceitou o convite de ${c.name}.`);save();render();toast('Convite aceito. Leia o cartão antes de gravar.')},
+  decline:()=>{go('c/home');toast('Tudo bem. O convite fica guardado para depois.')},
+  pickFile:e=>{const id=e.dataset.id,st=chkState(id),v=myVideo(id);st.file=`meu_video_v${v?v.versions.length+1:1}.mp4`;render()},
+  chkQ:e=>{chkState(e.dataset.id).q=e.dataset.q;UI.demoOpen=true;render()},
+  runCheck:e=>{const id=e.dataset.id,st=chkState(id);if(!st.file){const v=myVideo(id);st.file=`meu_video_v${v?v.versions.length+1:1}.mp4`}st.stage='analyzing';st.p=0;render();
+    const tick=()=>{if(!UI.chk[id]||UI.chk[id].stage!=='analyzing')return;st.p=Math.min(100,st.p+9+Math.round(Math.random()*8));if(st.p<100){render();setTimeout(tick,220);return}
+      const c=camp(id),b=brand(c.brandId);let v=myVideo(id);if(!v){v={id:'v'+Date.now(),campaignId:id,creatorId:S.me,status:'checando',roundsBrand:0,days:null,note:'',boosted:false,versions:[]};S.videos.push(v)}
+      if(v.status!=='ajuste')v.status='checando';
+      v.versions.push({n:v.versions.length+1,at:nowLabel(),file:st.file,...analyze(c,b,st.q,Date.now()%100000)});st.stage='result';st.file=null;UI.demoOpen=false;save();render();$('#cscroll')&&($('#cscroll').scrollTop=0)};setTimeout(tick,220)},
+  newVersion:e=>{const id=e.dataset.id;UI.chk[id]={stage:'upload',file:null,q:'bom',p:0};go('c/check/'+id)},
+  send:e=>{const id=e.dataset.id,c=camp(id),v=myVideo(id),x=last(v);v.status='enviado';feed(`${cr(S.me).name} enviou o vídeo de ${c.name} (aderência ${x.ader}, performance ${x.perf}) depois de ${v.versions.length} checagens.`);chkState(id).stage='sent';save();render();toast(`Enviado para ${brand(c.brandId).name}.`)},
+};
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',ev=>{const e=ev.target.closest('[data-act]');if(!e||e.disabled)return;const f=A[e.dataset.act];if(!f)return;if(e.dataset.act!=='closeSheetBg')ev.preventDefault();f(e,ev)});
+document.addEventListener('submit',ev=>{const f=ev.target;if(!f.dataset||!f.dataset.form)return;ev.preventDefault();
+  const email=($('#f-email').value||'').trim(),pass=$('#f-pass').value||'';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){UI.loginErr='Digite um e-mail válido, como nome@empresa.com.';render();return}
+  if(!pass){UI.loginErr='Digite a senha.';render();return}
+  finishLogin(UI.loginRole||'b')});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){if(UI.sheet){closeSheet();return}if(UI.tour){UI.tour=null;renderTour();return}}
+  const e=ev.target;if(ev.key==='Enter'&&e.dataset&&e.dataset.enter){ev.preventDefault();const f=A[e.dataset.enter];if(f)f(e,ev)}});
+document.addEventListener('input',ev=>{const e=ev.target,f=e.dataset&&e.dataset.field;
+  if(e.id==='adjText'){UI.adjText=e.value;return}
+  if((f==='w'||f==='minScore')&&e.nextElementSibling&&e.nextElementSibling.tagName==='OUTPUT') e.nextElementSibling.textContent=e.value;});
+document.addEventListener('change',ev=>{const e=ev.target,f=e.dataset&&e.dataset.field;if(!f)return;
+  if(f==='apprCamp')UI.apprCamp=e.value;
+  else if(f==='cmpA')UI.cmpA=e.value;else if(f==='cmpB')UI.cmpB=e.value;else if(f==='bt')UI.bt=e.value;
+  else if(f==='notif'){toast(e.checked?'Avisos ligados.':'Avisos desligados.');return}
+  else if(f==='bf'){const b=brand(S.route.split('/')[2]);b[e.dataset.key]=e.value;b.guideDirty=true}
+  else if(f==='w'){const l=critListFor(e.dataset.scope,e.dataset.id);l[+e.dataset.i].weight=clamp(parseInt(e.value)||0,0,40);if(e.dataset.scope==='brand')propagateBrand(brand(e.dataset.id));if(e.dataset.scope==='perf')S.campaigns.forEach(c=>{c.perf=JSON.parse(JSON.stringify(S.perf))})}
+  else if(f==='elim'){const l=critListFor(e.dataset.scope,e.dataset.id);l[+e.dataset.i].elim=e.checked;if(e.dataset.scope==='brand')propagateBrand(brand(e.dataset.id));toast(e.checked?'Agora este critério bloqueia o envio se falhar.':'Este critério não bloqueia mais o envio.')}
+  else if(f==='minScore'){if(e.dataset.scope==='brand')brand(e.dataset.id).minScore=+e.value;else UI.wizard.minScore=+e.value}
+  else if(f==='wz'){UI.wizard[e.dataset.key]=e.value;if(e.dataset.key==='brandId'){UI.wizard.critFor=null;UI.wizard.minScore=brand(e.value).minScore}}
+  else if(f==='wzCreator'){const w=UI.wizard;if(e.checked){if(!w.creators.includes(e.dataset.id))w.creators.push(e.dataset.id)}else w.creators=w.creators.filter(x=>x!==e.dataset.id)}
+  save();render()});
+
+/* ---------- início ---------- */
+if(S.route!=='site'&&S.route!=='login'&&!S.role) S.route='site';
+render();
+
+
+</script>
+</body>
+</html>
